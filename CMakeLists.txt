@@ -3,7 +3,9 @@ project(HydroSim LANGUAGES CXX)
 
 add_executable(HydroSim src/main.cpp
         src/Engine.cpp
-        src/Engine.h)
+        src/Engine.h
+        src/config.h
+        src/instance.h)
 
 # Pick a standard your compiler supports
 set_property(TARGET HydroSim PROPERTY CXX_STANDARD 23)
