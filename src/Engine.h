@@ -20,17 +20,18 @@ private:
     int height { 480 };
     GLFWwindow* window;
 
+    // Instance Objects
     vk::Instance instance; // Vulkan Instance
-
     vk::DebugUtilsMessengerEXT debugMessenger{ nullptr }; // Debug callback
-
     vk::detail::DispatchLoaderDynamic dldi; // Dynamic Instance dispatcher
+
+
 
     void build_glfw_window();
 
     void make_instance();
 
-    void make_debug_message();
+    void make_debug_messeger();
 };
 
 

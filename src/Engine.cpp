@@ -6,6 +6,7 @@
 #include <iostream>
 
 #include "instance.h"
+#include "logging.h"
 
 Engine::Engine() {
     if (debugMode) {
@@ -13,6 +14,7 @@ Engine::Engine() {
     }
     build_glfw_window();
     make_instance();
+    make_debug_messeger();
 }
 
 void Engine::build_glfw_window() {
@@ -40,17 +42,17 @@ void Engine::make_instance() {
     dldi = vk::detail::DispatchLoaderDynamic(instance, vkGetInstanceProcAddr);
 }
 
-void Engine::make_debug_message() {
+void Engine::make_debug_messeger() {
 
-    debugMessenger = vk::make_debug_message(instance, dldi);
+    debugMessenger = vkInit::make_debug_messeger(instance, dldi);
 }
 
 Engine::~Engine() {
     if (debugMode) {
         std::cout << "Deleting the Engine!\n";
     }
-
+    instance.destroyDebugUtilsMessengerEXT(debugMessenger, nullptr, dldi);
     instance.destroy();
-
     glfwTerminate();
+
 }
