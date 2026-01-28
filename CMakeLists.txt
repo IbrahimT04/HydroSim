@@ -7,7 +7,8 @@ add_executable(HydroSim src/main.cpp
         src/config.h
         src/instance.h
         src/logging.h
-        src/logging.cpp)
+        src/logging.cpp
+        src/device.h)
 
 # Pick a standard your compiler supports
 set_property(TARGET HydroSim PROPERTY CXX_STANDARD 23)

@@ -8,7 +8,7 @@
 
 namespace vkInit {
 
-    inline bool supported(const std::vector<const char*>& extensions, const std::vector<const char*>& layers, bool debug) {
+    inline bool supported(const std::vector<const char*>& extensions, const std::vector<const char*>& layers, const bool debug) {
 
         // Show all supported extensions
         const std::vector<vk::ExtensionProperties> supportedExtensions = vk::enumerateInstanceExtensionProperties();
