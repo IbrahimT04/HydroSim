@@ -6,6 +6,7 @@
 #define HYDROSIM_DEVICE_H
 
 #include "config.h"
+#include "set"
 
 namespace vkInit {
     inline void log_device_properties(const vk::PhysicalDevice& device) {
@@ -34,15 +35,27 @@ namespace vkInit {
         }
     }
 
-    inline bool checkDeviceExtensionSupport(vk::PhysicalDevice& device, const std::vector<const char*> & requestedExtensions, const bool debug) {
-        std::set<std::string>
+    inline bool checkDeviceExtensionSupport(const vk::PhysicalDevice& device, const std::vector<const char*>& requestedExtensions, const bool debug) {
+        std::set<std::string> requiredExtensions(requestedExtensions.begin(), requestedExtensions.end());
+
+        if (debug) {
+            std::cout << "Device can support these extensions:\n";
+        }
+        for (auto& extension: device.enumerateDeviceExtensionProperties()) {
+            if (debug) {
+                std::cout << "\t" << extension.extensionName << "\n";
+            }
+            requiredExtensions.erase(extension.extensionName);
+        }
+
+        return requiredExtensions.empty();
     }
 
     inline bool isSuitable(vk::PhysicalDevice device, const bool debug) {
         if (debug) {
             std::cout << "Checking if device is suitable\n";
         }
-        const std::vector<const char*> requestedExtensions {
+        const std::vector requestedExtensions {
             VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         };
 
@@ -52,7 +65,7 @@ namespace vkInit {
                 std::cout << "\t\"" << extension << "\"\n";
             }
         }
-        if (bool extensionSupported = checkDeviceExtensionSupport(device, requestedExtensions, debug)) {
+        if (checkDeviceExtensionSupport(device, requestedExtensions, debug)) {
             if (debug) {
                 std::cout << "Device supports the requested extensions\n";
             }
@@ -82,7 +95,7 @@ namespace vkInit {
             if (debug) {
                 log_device_properties(device);
             }
-            if (isSuitable(device, debug)) {
+            if (isSuitable(device, debug)) { // Currently chooses any GPU instead of the dedicated GPU. Later fix.
                 return device;
             }
         }
