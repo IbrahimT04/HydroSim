@@ -4,16 +4,18 @@
 
 #ifndef HYDROSIM_ENGINE_H
 #define HYDROSIM_ENGINE_H
+
+#define DEBUG_MODE 1
+
 #include "config.h"
 #include "frame.h"
-
 
 class Engine {
 public:
     Engine();
     ~Engine();
 private:
-    bool debugMode = true;
+    static constexpr bool debugMode = DEBUG_MODE;
     const char* name = "Sim Window";
 
     int width { 640 };
@@ -36,11 +38,18 @@ private:
     vk::Format swapchainFormat;
     vk::Extent2D swapchainExtent;
 
+    // Pipeline Objects
+    vk::PipelineLayout pipelineLayout { nullptr };
+    vk::RenderPass renderPass { nullptr };
+    vk::Pipeline pipeline { nullptr };
+
     void build_glfw_window();
 
     void make_instance();
 
     void make_device();
+
+    void make_pipeline();
 };
 
 

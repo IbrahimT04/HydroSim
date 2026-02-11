@@ -3,13 +3,17 @@
 //
 
 #include "Engine.h"
+
+#include <filesystem>
 #include <iostream>
 
 #include "queues.h"
 #include "instance.h"
 #include "logging.h"
 #include "device.h"
+#include "pipeline.h"
 #include "swapchain.h"
+#include "pipeline.h"
 
 Engine::Engine() {
     if (debugMode) {
@@ -18,6 +22,7 @@ Engine::Engine() {
     build_glfw_window();
     make_instance();
     make_device();
+    make_pipeline();
 }
 
 void Engine::build_glfw_window() {
@@ -73,11 +78,28 @@ void Engine::make_device() {
     swapchainFormat = bundle.format;
     swapchainExtent = bundle.extent;
 }
+void Engine::make_pipeline() {
+    vkInit::GraphicsPipelineInBundle specification = {};
+    specification.device = device;
+    specification.vertexFilePath = "spir_v_shaders/default.vert.spv";
+    specification.fragmentFilePath = "spir_v_shaders/default.frag.spv";
+    specification.swapchainExtent = swapchainExtent;
+    specification.swapchainFormat = swapchainFormat;
+    vkInit::GraphicsPipelineOutBundle output = vkInit::make_graphics_pipeline(specification, debugMode);
+    pipelineLayout = output.pipelineLayout;
+    renderPass = output.renderPass;
+    pipeline = output.pipeline;
+}
 
 Engine::~Engine() {
     if (debugMode) {
         std::cout << "Deleting the Engine!\n";
     }
+
+    device.destroyPipeline(pipeline);
+    device.destroyRenderPass(renderPass);
+    device.destroyPipelineLayout(pipelineLayout);
+
     for (auto [image, imageView] : swapchainFrames) {
         device.destroyImageView(imageView);
     }

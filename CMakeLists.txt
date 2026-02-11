@@ -13,7 +13,8 @@ add_executable(HydroSim src/main.cpp
         src/swapchain.h
         src/frame.h
         src/query_system.h
-        src/shaders.h)
+        src/shaders.h
+        src/pipeline.h)
 
 # Pick a standard your compiler supports
 set_property(TARGET HydroSim PROPERTY CXX_STANDARD 23)

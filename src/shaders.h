@@ -25,6 +25,26 @@ namespace vkUtil {
         file.close();
         return buffer;
     }
+
+    inline vk::ShaderModule createModule(const std::string& filename, const vk::Device device, const bool debug) {
+
+        std::vector<char> code = readFile(filename, debug);
+
+        vk::ShaderModuleCreateInfo createInfo{};
+        createInfo.flags = vk::ShaderModuleCreateFlags();
+        createInfo.codeSize = code.size();
+        createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+
+        try {
+            return device.createShaderModule(createInfo);
+        }
+        catch (const vk::SystemError&) {
+            if (debug) {
+                std::cout << "Failed to create shader module: " << std::endl;
+            }
+            return nullptr;
+        }
+    }
 }
 
 #endif //HYDROSIM_SHADERS_H
