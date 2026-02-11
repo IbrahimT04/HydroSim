@@ -6,34 +6,11 @@
 #define HYDROSIM_DEVICE_H
 
 #include "config.h"
+#include "queues.h"
+#include "logging.h"
 #include "set"
 
 namespace vkInit {
-    inline void log_device_properties(const vk::PhysicalDevice& device) {
-        vk::PhysicalDeviceProperties properties = device.getProperties();
-
-        std::cout << "Device Name: " << properties.deviceName << "\n";
-        std::cout << "Device Type: ";
-        switch (properties.deviceType) {
-            case (vk::PhysicalDeviceType::eCpu):
-                std::cout << "CPU\n";
-                break;
-            case (vk::PhysicalDeviceType::eDiscreteGpu):
-                std::cout << "Discrete GPU\n";
-                break;
-            case (vk::PhysicalDeviceType::eIntegratedGpu):
-                std::cout << "Integrated GPU\n";
-                break;
-            case (vk::PhysicalDeviceType::eVirtualGpu):
-                std::cout << "Virtual GPU\n";
-                break;
-            case (vk::PhysicalDeviceType::eOther):
-                std::cout << "Other GPU\n";
-                break;
-            default:
-                std::cout << "UNKNOWN\n";
-        }
-    }
 
     inline bool checkDeviceExtensionSupport(const vk::PhysicalDevice& device, const std::vector<const char*>& requestedExtensions, const bool debug) {
         std::set<std::string> requiredExtensions(requestedExtensions.begin(), requestedExtensions.end());
@@ -51,7 +28,7 @@ namespace vkInit {
         return requiredExtensions.empty();
     }
 
-    inline bool isSuitable(vk::PhysicalDevice device, const bool debug) {
+    inline bool isSuitable(const vk::PhysicalDevice device, const bool debug) {
         if (debug) {
             std::cout << "Checking if device is suitable\n";
         }
@@ -94,13 +71,72 @@ namespace vkInit {
 
             if (debug) {
                 log_device_properties(device);
-            }
-            if (isSuitable(device, debug)) { // Currently chooses any GPU instead of the dedicated GPU. Later fix.
+            }/*
+            if (isSuitable(device, debug) && device.getProperties().deviceType==vk::PhysicalDeviceType::eDiscreteGpu) {
+                // Option to choose dedicated GPU.
+                return device;
+            } */
+            if (isSuitable(device, debug)) { // Option to choose any GPU instead of the dedicated GPU.
                 return device;
             }
         }
 
         return nullptr;
+    }
+
+    inline vk::Device create_logical_device(const vk::PhysicalDevice physical_device, const vk::SurfaceKHR surface, const bool debug) {
+
+        QueueFamilyIndices indices = findQueueFamilies(physical_device, surface, debug);
+        std::vector<uint32_t> uniqueIndices;
+        uniqueIndices.push_back(indices.graphicsFamily.value());
+        if (indices.graphicsFamily.value() != indices.presentFamily.value()) {
+            uniqueIndices.push_back(indices.presentFamily.value());
+        }
+
+        constexpr float queuePriority = 1.0f;
+
+        std::vector<vk::DeviceQueueCreateInfo> queueCreateInfo;
+        for (uint32_t queueFamilyIndex : uniqueIndices) {
+            queueCreateInfo.emplace_back(
+                    vk::DeviceQueueCreateFlags(),
+                    queueFamilyIndex,
+                    1,
+                    &queuePriority
+                );
+        }
+        auto deviceFeatures = vk::PhysicalDeviceFeatures();
+        // deviceFeatures.samplerAnisotropy = true; // Set the physical device features.
+
+        std::vector<const char*> enabledLayers;
+        if (debug) {
+            enabledLayers.push_back("VK_LAYER_KHRONOS_validation");
+        }
+
+        std::vector deviceExtensions = {
+            VK_KHR_SWAPCHAIN_EXTENSION_NAME
+        };
+
+        auto deviceInfo = vk::DeviceCreateInfo(
+            vk::DeviceCreateFlags(),
+            queueCreateInfo.size(), queueCreateInfo.data(),
+            enabledLayers.size(), enabledLayers.data(),
+            deviceExtensions.size(), deviceExtensions.data(),
+            &deviceFeatures
+            );
+
+        try {
+            vk::Device device = physical_device.createDevice(deviceInfo);
+            if (debug) {
+                std::cout << "Successfully created logical device from GPU\n";
+            }
+            return device;
+        }
+        catch (const vk::SystemError& e) {
+            if (debug) {
+                std::cout << "Error creating logical device: " << e.what() << std::endl;
+            }
+            return nullptr;
+        }
     }
 }
 

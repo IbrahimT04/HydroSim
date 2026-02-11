@@ -4,8 +4,8 @@
 
 #ifndef HYDROSIM_ENGINE_H
 #define HYDROSIM_ENGINE_H
-#include "GLFW/glfw3.h"
 #include "config.h"
+#include "frame.h"
 
 
 class Engine {
@@ -24,8 +24,17 @@ private:
     vk::Instance instance; // Vulkan Instance
     vk::DebugUtilsMessengerEXT debugMessenger { nullptr }; // Debug callback
     vk::detail::DispatchLoaderDynamic dldi; // Dynamic Instance dispatcher
+    vk::SurfaceKHR surface;
 
-    vk::PhysicalDevice physicalDevice { nullptr };
+    // Device Objects
+    vk::PhysicalDevice physicalDevice { nullptr }; // Actual GPU
+    vk::Device device { nullptr }; // Abstraction of the GPU in use
+    vk::Queue graphicsQueue { nullptr };
+    vk::Queue presentQueue { nullptr };
+    vk::SwapchainKHR swapchain { nullptr };
+    std::vector<vkUtil::SwapchainFrame> swapchainFrames;
+    vk::Format swapchainFormat;
+    vk::Extent2D swapchainExtent;
 
     void build_glfw_window();
 

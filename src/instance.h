@@ -13,7 +13,7 @@ namespace vkInit {
         // Show all supported extensions
         const std::vector<vk::ExtensionProperties> supportedExtensions = vk::enumerateInstanceExtensionProperties();
         if (debug) {
-            std::cout << "Device can support the following extensions:\n";
+            std::cout << "System can support the following extensions:\n";
             for (auto supportedExtension: supportedExtensions) {
                 std::cout << '\t' << supportedExtension.extensionName << '\n';
             }
@@ -40,7 +40,7 @@ namespace vkInit {
         // Show all supported layers
         const std::vector<vk::LayerProperties> supportedLayers = vk::enumerateInstanceLayerProperties();
         if (debug) {
-            std::cout << "Device can support the following layers:\n";
+            std::cout << "System can support the following layers:\n";
             for (auto supportedLayer: supportedLayers) {
                 std::cout << '\t' << supportedLayer.layerName << '\n';
             }
