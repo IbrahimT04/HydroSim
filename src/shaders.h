@@ -26,7 +26,7 @@ namespace vkUtil {
         return buffer;
     }
 
-    inline vk::ShaderModule createModule(const std::string& filename, const vk::Device device, const bool debug) {
+    inline vk::ShaderModule createModule(const std::string& filename, const vk::Device& device, const bool debug) {
 
         std::vector<char> code = readFile(filename, debug);
 

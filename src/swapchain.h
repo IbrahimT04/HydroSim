@@ -24,8 +24,8 @@ namespace vkInit {
         std::vector<vkUtil::SwapchainFrame> frames;
     };
 
-    inline SwapChainSupportDetails query_swapchain_support(const vk::PhysicalDevice device,
-                                                           const vk::SurfaceKHR surface, const bool debug) {
+    inline SwapChainSupportDetails query_swapchain_support(const vk::PhysicalDevice& device,
+                                                           const vk::SurfaceKHR& surface, const bool debug) {
         SwapChainSupportDetails support;
         support.capabilities = device.getSurfaceCapabilitiesKHR(surface);
 
@@ -130,8 +130,8 @@ namespace vkInit {
         return extent;
     }
 
-    inline SwapChainBundle create_swapchain(const vk::Device logicalDevice, const vk::PhysicalDevice physicalDevice,
-                                            vk::SurfaceKHR surface, const int width, const int height,
+    inline SwapChainBundle create_swapchain(const vk::Device& logicalDevice, const vk::PhysicalDevice& physicalDevice,
+                                            vk::SurfaceKHR& surface, const int width, const int height,
                                             const bool debug) {
         const SwapChainSupportDetails support = query_swapchain_support(physicalDevice, surface, debug);
 

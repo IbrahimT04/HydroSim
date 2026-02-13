@@ -14,7 +14,12 @@ add_executable(HydroSim src/main.cpp
         src/frame.h
         src/query_system.h
         src/shaders.h
-        src/pipeline.h)
+        src/pipeline.h
+        src/framebuffer.h
+        src/commands.h
+        src/sync.h
+        src/app.h
+        src/app.cpp)
 
 # Pick a standard your compiler supports
 set_property(TARGET HydroSim PROPERTY CXX_STANDARD 23)
@@ -106,28 +111,28 @@ foreach(SHADER ${SHADER_SOURCES})
             VERBATIM
     )
 
-    # Optional validation step (runs only if spirv-val exists)
-    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        if (SPIRV_VAL)
-            add_custom_command(
-                    OUTPUT "${OUT_SPV}.validated"
-                    COMMAND "${SPIRV_VAL}" "${OUT_SPV}"
-                    COMMAND "${CMAKE_COMMAND}" -E touch "${OUT_SPV}.validated"
-                    DEPENDS "${OUT_SPV}"
-                    COMMENT "Validating SPIR-V ${REL_PATH}.spv"
-                    VERBATIM
-            )
-            list(APPEND SHADER_OUTPUTS "${OUT_SPV}.validated")
-        else()
-            list(APPEND SHADER_OUTPUTS "${OUT_SPV}")
-        endif()
+    # Always build SPV in all configs
+    if (SPIRV_VAL AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+        add_custom_command(
+                OUTPUT "${OUT_SPV}.validated"
+                COMMAND "${SPIRV_VAL}" "${OUT_SPV}"
+                COMMAND "${CMAKE_COMMAND}" -E touch "${OUT_SPV}.validated"
+                DEPENDS "${OUT_SPV}"
+                COMMENT "Validating SPIR-V ${REL_PATH}.spv"
+                VERBATIM
+        )
+        list(APPEND SHADER_OUTPUTS "${OUT_SPV}.validated")
+    else()
+        list(APPEND SHADER_OUTPUTS "${OUT_SPV}")
     endif()
 endforeach()
+
 
 add_custom_target(Shaders ALL DEPENDS ${SHADER_OUTPUTS})
 add_dependencies(HydroSim Shaders)
 
 add_custom_command(TARGET HydroSim POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:HydroSim>/shaders"
         COMMAND "${CMAKE_COMMAND}" -E copy_directory
         "${SHADER_BIN_DIR}"
         "$<TARGET_FILE_DIR:HydroSim>/shaders"

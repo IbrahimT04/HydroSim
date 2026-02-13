@@ -23,7 +23,7 @@ namespace vkInit {
         vk::Pipeline pipeline;
     };
 
-    inline vk::RenderPass make_renderpass(const vk::Device device, const vk::Format swapchainImageFormat, const bool debug) {
+    inline vk::RenderPass make_renderpass(const vk::Device& device, const vk::Format& swapchainImageFormat, const bool debug) {
         vk::AttachmentDescription colorAttachment = {};
         colorAttachment.flags = vk::AttachmentDescriptionFlags();
         colorAttachment.format = swapchainImageFormat;
@@ -62,7 +62,7 @@ namespace vkInit {
         }
     }
 
-    inline vk::PipelineLayout make_pipeline_layout(const vk::Device device, const bool debug) {
+    inline vk::PipelineLayout make_pipeline_layout(const vk::Device& device, const bool debug) {
         vk::PipelineLayoutCreateInfo pipelineLayoutInfo = {};
         pipelineLayoutInfo.flags = vk::PipelineLayoutCreateFlags();
         pipelineLayoutInfo.setLayoutCount = 0;

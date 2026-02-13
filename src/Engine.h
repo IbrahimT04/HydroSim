@@ -5,18 +5,17 @@
 #ifndef HYDROSIM_ENGINE_H
 #define HYDROSIM_ENGINE_H
 
-#define DEBUG_MODE 1
-
 #include "config.h"
 #include "frame.h"
 
 class Engine {
 public:
-    Engine();
+    Engine(int width, int height, GLFWwindow* window, bool debug);
     ~Engine();
+    void render();
 private:
-    static constexpr bool debugMode = DEBUG_MODE;
     const char* name = "Sim Window";
+    bool debugMode;
 
     int width { 640 };
     int height { 480 };
@@ -43,13 +42,22 @@ private:
     vk::RenderPass renderPass { nullptr };
     vk::Pipeline pipeline { nullptr };
 
-    void build_glfw_window();
+    // Command Pool/Buffer Objects
+    vk::CommandPool commandPool { nullptr };
+    vk::CommandBuffer mainCommandBuffer { nullptr };
+
+    // Synchronisation Objects
+    int maxFramesInFlight, frameNumber;
 
     void make_instance();
 
     void make_device();
 
     void make_pipeline();
+
+    void finalize_setep();
+
+    void record_draw_commands(const vk::CommandBuffer& commandBuffer, uint32_t imageIndex);
 };
 
 

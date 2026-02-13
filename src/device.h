@@ -28,7 +28,7 @@ namespace vkInit {
         return requiredExtensions.empty();
     }
 
-    inline bool isSuitable(const vk::PhysicalDevice device, const bool debug) {
+    inline bool isSuitable(const vk::PhysicalDevice& device, const bool debug) {
         if (debug) {
             std::cout << "Checking if device is suitable\n";
         }
@@ -71,20 +71,20 @@ namespace vkInit {
 
             if (debug) {
                 log_device_properties(device);
-            }/*
+            }
             if (isSuitable(device, debug) && device.getProperties().deviceType==vk::PhysicalDeviceType::eDiscreteGpu) {
                 // Option to choose dedicated GPU.
                 return device;
-            } */
+            }  /*
             if (isSuitable(device, debug)) { // Option to choose any GPU instead of the dedicated GPU.
                 return device;
-            }
+            } */
         }
 
         return nullptr;
     }
 
-    inline vk::Device create_logical_device(const vk::PhysicalDevice physical_device, const vk::SurfaceKHR surface, const bool debug) {
+    inline vk::Device create_logical_device(const vk::PhysicalDevice& physical_device, const vk::SurfaceKHR& surface, const bool debug) {
 
         QueueFamilyIndices indices = findQueueFamilies(physical_device, surface, debug);
         std::vector<uint32_t> uniqueIndices;

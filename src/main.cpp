@@ -1,16 +1,13 @@
-#include "Engine.h"
+#include "app.h"
 #include "query_system.h"
-
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
 
 int main() {
 
-    ioUtil::print_system_type();
+    // ioUtil::print_system_type();
 
-    const auto* graphicsEngine = new Engine();
-
-    delete graphicsEngine;
+    const auto myApp = new App("HydroSim", 640, 480);
+    myApp->run();
+    delete myApp;
 
     return 0;
 }
