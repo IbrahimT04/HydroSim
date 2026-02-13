@@ -8,7 +8,7 @@
 #include "config.h"
 
 namespace vkInit {
-    inline vk::Semaphore make_semophore(const vk::Device& device, const bool debug){
+    inline vk::Semaphore make_semaphore(const vk::Device& device, const bool debug){
         vk::SemaphoreCreateInfo semaphoreInfo = {};
         semaphoreInfo.flags = vk::SemaphoreCreateFlags();
 

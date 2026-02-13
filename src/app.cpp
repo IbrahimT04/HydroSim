@@ -42,17 +42,28 @@ void App::run() {
 
 void App::calculate_frame_rate() {
     currentTime = glfwGetTime();
-    if (const double deltaTime = currentTime - lastTime; deltaTime >= 1.0) {
-        const int fps{ std::max(1, static_cast<int>(numFrames / deltaTime)) };
-        std::stringstream title;
-        title << "Running " << windowName << " at FPS: " << fps << " fps";
-        glfwSetWindowTitle(window, title.str().c_str());
-        lastTime = currentTime;
-        numFrames = -1;
-        frameTime = static_cast<float>(1000.0 / fps);
-    }
     numFrames++;
+
+    double delta = currentTime - lastTime;
+    if (delta >= 1.0) {
+        double fps = numFrames / delta;
+        double ms_per_frame = (delta * 1000.0) / numFrames;
+
+        std::ostringstream title;
+        title.setf(std::ios::fixed);
+        title.precision(1);
+        title << "Running " << windowName
+              << " | FPS: " << fps
+              << " | " << ms_per_frame << " ms";
+
+        glfwSetWindowTitle(window, title.str().c_str());
+
+        lastTime = currentTime;
+        numFrames = 0;
+        frameTime = static_cast<float>(ms_per_frame);
+    }
 }
+
 
 App::~App() {
     delete graphicsEngine;

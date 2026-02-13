@@ -47,7 +47,14 @@ private:
     vk::CommandBuffer mainCommandBuffer { nullptr };
 
     // Synchronisation Objects
-    int maxFramesInFlight, frameNumber;
+    static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 3;
+    uint32_t currentFrame = 0;
+
+    std::array<vk::Semaphore, MAX_FRAMES_IN_FLIGHT> imageAvailable;
+    std::array<vk::Fence, MAX_FRAMES_IN_FLIGHT> inFlightFences;
+
+    // Track which fence is using each swapchain image
+    std::vector<vk::Fence> imagesInFlight;
 
     void make_instance();
 
