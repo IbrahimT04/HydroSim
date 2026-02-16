@@ -33,28 +33,14 @@ namespace vkInit {
             return nullptr;
         }
     }
-    inline vk::CommandBuffer make_command_buffers(const CommandBufferInputChunk& inputChunk, const bool debug) {
+    inline vk::CommandBuffer make_command_buffer(const vk::Device& device, const vk::CommandPool& commandPool, const bool debug) {
         vk::CommandBufferAllocateInfo allocateInfo = {};
-        allocateInfo.commandPool = inputChunk.commandPool;
+        allocateInfo.commandPool = commandPool;
         allocateInfo.level = vk::CommandBufferLevel::ePrimary;
         allocateInfo.commandBufferCount = 1;
 
-        for (int i=0; i < inputChunk.frames.size(); i++) {
-            try {
-                inputChunk.frames[i].commandBuffer = inputChunk.device.allocateCommandBuffers(allocateInfo)[0];
-                if (debug) {
-                    std::cout << "Allocated command buffer for frame " << i << std::endl;
-                }
-            }
-            catch (vk::SystemError&) {
-                if (debug) {
-                    std::cerr << "Failed to allocate command buffer for frame" << i << std::endl;
-                }
-            }
-        }
-
         try {
-            vk::CommandBuffer mainCommandBuffer = inputChunk.device.allocateCommandBuffers(allocateInfo)[0];
+            const vk::CommandBuffer mainCommandBuffer = device.allocateCommandBuffers(allocateInfo).front();
             if (debug) {
                 std::cout << "Allocated main command buffer" << std::endl;
             }
@@ -67,6 +53,40 @@ namespace vkInit {
             return nullptr;
         }
     }
+    // inline vk::CommandBuffer make_command_buffers(const CommandBufferInputChunk& inputChunk, const bool debug) {
+    //     vk::CommandBufferAllocateInfo allocateInfo = {};
+    //     allocateInfo.commandPool = inputChunk.commandPool;
+    //     allocateInfo.level = vk::CommandBufferLevel::ePrimary;
+    //     allocateInfo.commandBufferCount = 1;
+    //
+    //     for (int i=0; i < inputChunk.frames.size(); i++) {
+    //         try {
+    //             inputChunk.frames[i].commandBuffer = inputChunk.device.allocateCommandBuffers(allocateInfo)[0];
+    //             if (debug) {
+    //                 std::cout << "Allocated command buffer for frame " << i << std::endl;
+    //             }
+    //         }
+    //         catch (vk::SystemError&) {
+    //             if (debug) {
+    //                 std::cerr << "Failed to allocate command buffer for frame" << i << std::endl;
+    //             }
+    //         }
+    //     }
+    //
+    //     try {
+    //         vk::CommandBuffer mainCommandBuffer = inputChunk.device.allocateCommandBuffers(allocateInfo)[0];
+    //         if (debug) {
+    //             std::cout << "Allocated main command buffer" << std::endl;
+    //         }
+    //         return mainCommandBuffer;
+    //     }
+    //     catch (vk::SystemError&) {
+    //         if (debug) {
+    //             std::cerr << "Failed to allocate main command buffer" << std::endl;
+    //         }
+    //         return nullptr;
+    //     }
+    // }
 
 }
 

@@ -19,7 +19,11 @@ add_executable(HydroSim src/main.cpp
         src/commands.h
         src/sync.h
         src/app.h
-        src/app.cpp)
+        src/app.cpp
+        src/render_structs.h
+        src/scene.h
+        src/scene.cpp
+)
 
 # Pick a standard your compiler supports
 set_property(TARGET HydroSim PROPERTY CXX_STANDARD 23)
@@ -34,6 +38,10 @@ set(GLFW_BUILD_TESTS    OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_DOCS     OFF CACHE BOOL "" FORCE)
 set(GLFW_INSTALL        OFF CACHE BOOL "" FORCE)
 add_subdirectory(external/glfw)
+
+# ---- GLM (header-only) ----
+add_subdirectory(external/glm)
+target_link_libraries(HydroSim PRIVATE glm::glm)
 
 # Link against targets (brings include dirs automatically)
 target_link_libraries(HydroSim PRIVATE Vulkan::Vulkan glfw)

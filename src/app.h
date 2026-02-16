@@ -8,6 +8,7 @@
 
 #include <GLFW/glfw3.h>
 #include "Engine.h"
+#include "scene.h"
 
 class App {
 public:
@@ -20,6 +21,7 @@ private:
     std::string windowName;
     Engine* graphicsEngine;
     GLFWwindow* window { nullptr };
+    Scene* scene { nullptr };
 
     double lastTime, currentTime;
     int numFrames;

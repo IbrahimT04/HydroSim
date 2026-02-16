@@ -7,6 +7,7 @@
 
 #include "config.h"
 #include "shaders.h"
+#include "render_structs.h"
 
 namespace vkInit {
     struct GraphicsPipelineInBundle {
@@ -66,7 +67,12 @@ namespace vkInit {
         vk::PipelineLayoutCreateInfo pipelineLayoutInfo = {};
         pipelineLayoutInfo.flags = vk::PipelineLayoutCreateFlags();
         pipelineLayoutInfo.setLayoutCount = 0;
-        pipelineLayoutInfo.pushConstantRangeCount = 0;
+        pipelineLayoutInfo.pushConstantRangeCount = 1;
+        vk::PushConstantRange pushConstantRange = {};
+        pushConstantRange.offset = 0;
+        pushConstantRange.size = sizeof(vkUtil::ObjectData);
+        pushConstantRange.stageFlags = vk::ShaderStageFlagBits::eVertex;
+        pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
 
         try {
             return device.createPipelineLayout(pipelineLayoutInfo);

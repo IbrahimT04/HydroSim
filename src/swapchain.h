@@ -139,7 +139,10 @@ namespace vkInit {
         const vk::PresentModeKHR presentMode = choose_swapchain_present_mode(support.presentModes);
         const vk::Extent2D extent = choose_swapchain_extent(width, height, support.capabilities);
 
-        const uint32_t imageCount = std::min(support.capabilities.minImageCount + 1, support.capabilities.maxImageCount);
+        uint32_t imageCount = support.capabilities.minImageCount + 1;
+        if (support.capabilities.maxImageCount > 0) {
+            imageCount = std::min(imageCount, support.capabilities.maxImageCount);
+        }
 
         auto createInfo = vk::SwapchainCreateInfoKHR(
             vk::SwapchainCreateFlagsKHR(),
@@ -196,6 +199,7 @@ namespace vkInit {
 
             bundle.frames[i].image = images[i];
             bundle.frames[i].imageView = logicalDevice.createImageView(createImageInfo);
+            bundle.frames[i].frameBuffer = vk::Framebuffer(nullptr);
         }
         bundle.format = format.format;
         bundle.extent = extent;

@@ -9,11 +9,21 @@
 
 namespace vkUtil {
     struct SwapchainFrame {
-        vk::Image image;
-        vk::ImageView imageView;
-        vk::Framebuffer frameBuffer;
-        vk::CommandBuffer commandBuffer;
-        vk::Semaphore renderFinished;
+        vk::Image image {nullptr};
+        vk::ImageView imageView {nullptr};
+        vk::Framebuffer frameBuffer {nullptr};
+
+        vk::Semaphore renderFinished {nullptr};
+    };
+
+    struct InFlightFrame {
+        vk::CommandPool commandPool {nullptr};
+        vk::CommandBuffer mainCommandBuffer {nullptr};
+
+        vk::Semaphore imageAvailable {nullptr};
+        vk::Fence fence {nullptr};
+
+        uint32_t imageIndex = 0;
     };
 }
 

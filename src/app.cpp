@@ -12,6 +12,8 @@ App::App(const std::string &name, const int width, const int height) {
     build_glfw_window(width, height);
 
     graphicsEngine = new Engine(width, height, window, debugMode);
+
+    scene = new Scene();
 }
 
 void App::build_glfw_window(const int width, const int height) {
@@ -35,7 +37,7 @@ void App::build_glfw_window(const int width, const int height) {
 void App::run() {
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
-        graphicsEngine->render();
+        graphicsEngine->render(scene);
         calculate_frame_rate();
     }
 }
@@ -67,6 +69,7 @@ void App::calculate_frame_rate() {
 
 App::~App() {
     delete graphicsEngine;
+    delete scene;
 }
 
 
