@@ -8,6 +8,7 @@
 #include "config.h"
 #include "shaders.h"
 #include "render_structs.h"
+#include "mesh.h"
 
 namespace vkInit {
     struct GraphicsPipelineInBundle {
@@ -94,10 +95,17 @@ namespace vkInit {
 
         // ------------------ Pipeline Steps ------------------
         // Step 1: Vertex Input
+        // 1.1
+        vk::VertexInputBindingDescription vertexInputBinding =
+            vkMesh::getBindingDesc(vkMesh::BindingType::PositionColor);
+        std::array<vk::VertexInputAttributeDescription, 2> vertexInputAttributes = vkMesh::getPosColorAttributeDesc();
+        // 1.2
         vk::PipelineVertexInputStateCreateInfo vertexInputInfo = {};
         vertexInputInfo.flags = vk::PipelineVertexInputStateCreateFlags();
-        vertexInputInfo.vertexBindingDescriptionCount = 0;
-        vertexInputInfo.vertexAttributeDescriptionCount = 0;
+        vertexInputInfo.vertexBindingDescriptionCount = 1;
+        vertexInputInfo.pVertexBindingDescriptions = &vertexInputBinding;
+        vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(vertexInputAttributes.size());
+        vertexInputInfo.pVertexAttributeDescriptions = vertexInputAttributes.data();
         pipelineInfo.pVertexInputState = &vertexInputInfo;
 
         // Step 2: Input Assembly
@@ -217,7 +225,7 @@ namespace vkInit {
         try {
             graphicsPipeline = (specification.device.createGraphicsPipeline(nullptr, pipelineInfo)).value;
         }
-        catch (const vk::SystemError& e) {
+        catch (const vk::SystemError&) {
             if (debug) {
                 std::cout << "Failed to create Graphics Pipeline!" << std::endl;
             }

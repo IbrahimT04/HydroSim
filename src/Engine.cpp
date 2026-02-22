@@ -34,6 +34,8 @@ Engine::Engine(const int width, const int height, GLFWwindow* window, const bool
     make_framebuffers();
     create_inflight_frames();
 
+    make_assets();
+
     imagesInFlight.assign(swapchainFrames.size(), vk::Fence{});
 
 }
@@ -83,7 +85,6 @@ void Engine::make_swapchain() {
         frame.renderFinished = vkInit::make_semaphore(device, debugMode);
     }
 }
-
 void Engine::cleanup_swapchain() {
     for (const auto& frame : swapchainFrames) {
         if (frame.frameBuffer) device.destroyFramebuffer(frame.frameBuffer);
@@ -114,7 +115,6 @@ void Engine::make_pipeline() {
     renderPass = output.renderPass;
     pipeline = output.pipeline;
 }
-
 void Engine::cleanup_pipeline() {
     if (pipeline) {
         device.destroyPipeline(pipeline);
@@ -138,6 +138,7 @@ void Engine::make_framebuffers() {
     frameBufferInput.swapchainExtent = swapchainExtent;
     vkInit::make_framebuffer(frameBufferInput, swapchainFrames, debugMode);
 }
+
 void Engine::create_inflight_frames() {
     for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         auto& frame = inFlightFrames[i];
@@ -151,7 +152,6 @@ void Engine::create_inflight_frames() {
         frame.imageIndex = 0;
     }
 }
-
 void Engine::destroy_inflight_frames() {
     for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         auto& frame = inFlightFrames[i];
@@ -190,6 +190,14 @@ void Engine::recreate_swapchain() {
     imagesInFlight.assign(swapchainFrames.size(), vk::Fence{});
 }
 
+void Engine::make_assets() {
+    triangleMesh = new vkMesh::TriangleMesh(device, physicalDevice);
+}
+void Engine::prepare_scene(const vk::CommandBuffer& commandBuffer) const {
+    const vk::Buffer vertexBuffers[] = { triangleMesh ->vertexBuffer.buffer };
+    const vk::DeviceSize offsets[] = { 0 };
+    commandBuffer.bindVertexBuffers(0,  1, vertexBuffers, offsets);
+}
 
 void Engine::record_draw_commands(const vk::CommandBuffer& commandBuffer, const uint32_t imageIndex, const Scene* scene) const {
 
@@ -207,7 +215,8 @@ void Engine::record_draw_commands(const vk::CommandBuffer& commandBuffer, const 
 
     commandBuffer.beginRenderPass(renderInfo, vk::SubpassContents::eInline);
     commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
-    // commandBuffer.draw(3, 1, 0, 0);
+
+    prepare_scene(commandBuffer);
 
     for (glm::vec3 position : scene->trianglePositions) {
         const glm::mat4 model = glm::translate(glm::mat4(1.0f), position);
@@ -330,6 +339,8 @@ Engine::~Engine() {
     destroy_inflight_frames();
     cleanup_pipeline();
     cleanup_swapchain();
+
+    delete triangleMesh;
 
     if (device) device.destroy();
     if (surface) instance.destroySurfaceKHR(surface);

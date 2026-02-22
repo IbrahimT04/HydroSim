@@ -8,6 +8,7 @@
 #include "config.h"
 #include "frame.h"
 #include "scene.h"
+#include "triangle_mesh.h"
 
 class Engine {
 public:
@@ -57,6 +58,9 @@ private:
     // Track which fence is using each swapchain image
     std::vector<vk::Fence> imagesInFlight;
 
+    // Asset Pointers
+    vkMesh::TriangleMesh* triangleMesh;
+
     void make_instance();
     void make_device();
 
@@ -71,6 +75,9 @@ private:
 
     void create_inflight_frames();
     void destroy_inflight_frames();
+
+    void make_assets();
+    void prepare_scene(const vk::CommandBuffer &commandBuffer) const;
 
     void record_draw_commands(const vk::CommandBuffer& commandBuffer, uint32_t imageIndex, const Scene* scene) const;
 };

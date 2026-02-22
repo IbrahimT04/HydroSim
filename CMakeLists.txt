@@ -23,6 +23,11 @@ add_executable(HydroSim src/main.cpp
         src/render_structs.h
         src/scene.h
         src/scene.cpp
+        src/mesh.h
+        src/memory.h
+        src/memory.cpp
+        src/triangle_mesh.h
+        src/triangle_mesh.cpp
 )
 
 # Pick a standard your compiler supports
