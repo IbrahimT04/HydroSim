@@ -1,13 +1,16 @@
-#include "app.h"
-#include "query_system.h"
+//
+// Created by itari on 2026-02-24.
+//
+
+#include <iostream>
+
+#include "src/config.h"
+#include "src/VulkanEngine.h"
 
 int main() {
 
-    // ioUtil::print_system_type();
-
-    const auto myApp = new App("HydroSim", 640, 480);
-    myApp->run();
-    delete myApp;
+    const auto engine = VulkanEngine();
+    engine.run();
 
     return 0;
 }

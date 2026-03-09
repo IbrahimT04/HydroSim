@@ -1,19 +1,22 @@
 //
-// Created by itari on 2026-01-25.
+// Created by itari on 2026-02-24.
 //
 
-#ifndef HYDROSIM_CONFIG_H
-#define HYDROSIM_CONFIG_H
+#ifndef HYDROSIM_IMPORT_CONFIG_H
+#define HYDROSIM_IMPORT_CONFIG_H
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#include <vulkan/vulkan.hpp>
+#define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
+#include <vulkan/vulkan_raii.hpp>
+
 #include <iostream>
-#include<vector>
-#include<fstream>
+#include <string>
+#include <vector>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#endif //HYDROSIM_CONFIG_H
+
+#endif //HYDROSIM_IMPORT_CONFIG_H

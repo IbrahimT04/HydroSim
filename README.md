@@ -1,1 +1,3 @@
-A Vulkan fluid simulator
+A Vulkan waves simulator
+
+Cooley tokey fft (I hope)
