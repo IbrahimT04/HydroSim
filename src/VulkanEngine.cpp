@@ -16,9 +16,10 @@ VulkanEngine::VulkanEngine(const int window_width, const int window_height, cons
     window = create_window();
     instance = create_instance();
     create_debugger();
+    create_surface();
     pick_physical_device();
     create_logical_device();
-    graphicsQueue = vk::raii::Queue( device, vkDevice::get_graphics_index(physicalDevice), 0 );
+    queue = vk::raii::Queue(device,vkDevice::get_queue_index(physicalDevice,surface),0);
 
 }
 GLFWwindow* VulkanEngine::create_window() const {
@@ -77,7 +78,14 @@ void VulkanEngine::pick_physical_device() {
 }
 void VulkanEngine::create_logical_device() {
 
-    device = vkDevice::make_logical_device(physicalDevice, requiredDeviceExtension);
+    device = vkDevice::make_logical_device(physicalDevice, surface, requiredDeviceExtension);
+}
+void VulkanEngine::create_surface() {
+    VkSurfaceKHR       _surface;
+    if (glfwCreateWindowSurface(*instance, window, nullptr, &_surface) != 0) {
+        throw std::runtime_error("failed to create window surface!");
+    }
+    surface = vk::raii::SurfaceKHR(instance, _surface);
 }
 
 VulkanEngine::~VulkanEngine() {

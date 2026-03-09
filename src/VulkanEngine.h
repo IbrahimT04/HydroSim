@@ -46,13 +46,12 @@ private:
     vk::raii::Instance instance {nullptr}; // Vulkan Instance
     vk::raii::DebugUtilsMessengerEXT debugMessenger = nullptr; // Debug callback
     vk::detail::DispatchLoaderDynamic dldi; // Dynamic Instance dispatcher
-    vk::SurfaceKHR surface {nullptr};
+    vk::raii::SurfaceKHR surface {nullptr};
 
     // Device Objects
     vk::raii::PhysicalDevice physicalDevice { nullptr }; // Actual GPU
     vk::raii::Device device { nullptr }; // Abstraction of the GPU in use
-    vk::raii::Queue graphicsQueue {nullptr};
-    vk::raii::Queue presentQueue {nullptr};
+    vk::raii::Queue queue {nullptr};
 
     // Swapchain Objects
     vk::raii::SwapchainKHR swapchain { nullptr };
@@ -66,6 +65,7 @@ private:
     void create_debugger();
     void pick_physical_device();
     void create_logical_device();
+    void create_surface();
 
 };
 

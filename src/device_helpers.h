@@ -66,28 +66,37 @@ namespace vkDevice {
         return std::move(*devIter);
     }
 
-    inline uint32_t get_graphics_index(const vk::raii::PhysicalDevice &physical_device) {
+    inline uint32_t get_queue_index(const vk::raii::PhysicalDevice &physical_device, const vk::raii::SurfaceKHR &surface) {
         std::vector<vk::QueueFamilyProperties> queueFamilyProperties = physical_device.getQueueFamilyProperties();
 
-        const auto graphicsQueueFamilyProperty = std::ranges::find_if(
-            queueFamilyProperties, [](auto const &qfp) {
-                return (qfp.queueFlags & vk::QueueFlagBits::eGraphics) != static_cast<vk::QueueFlags>(0);
-            });
-        auto graphicsIndex = static_cast<uint32_t>(
-            std::distance(queueFamilyProperties.begin(), graphicsQueueFamilyProperty)
-        );
-        return graphicsIndex;
+        uint32_t queueIndex = ~0;
+        for (uint32_t qfpIndex = 0; qfpIndex < queueFamilyProperties.size(); qfpIndex++)
+        {
+            if ((queueFamilyProperties[qfpIndex].queueFlags & vk::QueueFlagBits::eGraphics) &&
+                physical_device.getSurfaceSupportKHR(qfpIndex, *surface))
+            {
+                // found a queue family that supports both graphics and present
+                queueIndex = qfpIndex;
+                break;
+            }
+        }
+        if (queueIndex == ~0)
+        {
+            throw std::runtime_error("Could not find a queue for graphics and present -> terminating");
+        }
+        return queueIndex;
     }
 
     inline vk::raii::Device make_logical_device(const vk::raii::PhysicalDevice &physical_device,
+                                                const vk::raii::SurfaceKHR &surface,
                                                 const std::vector<const char *> &requiredDeviceExtension) {
         std::vector<vk::QueueFamilyProperties> queueFamilyProperties = physical_device.getQueueFamilyProperties();
 
-        auto graphicsIndex = get_graphics_index(physical_device);
+        auto queueIndex = get_queue_index(physical_device, surface);
 
         float queuePriority = 0.5f;
         vk::DeviceQueueCreateInfo deviceQueueCreateInfo{
-            .queueFamilyIndex = graphicsIndex,
+            .queueFamilyIndex = queueIndex,
             .queueCount = 1,
             .pQueuePriorities = &queuePriority
         };
