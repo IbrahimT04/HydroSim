@@ -55,9 +55,10 @@ private:
 
     // Swapchain Objects
     vk::raii::SwapchainKHR swapchain { nullptr };
-    // std::vector<vkUtil::SwapchainFrame> swapchainFrames;
-    vk::Format swapchainFormat {};
+    std::vector<vk::Image> swapchainImages;
+    vk::SurfaceFormatKHR swapchainSurfaceFormat {};
     vk::Extent2D swapchainExtent {};
+    std::vector<vk::raii::ImageView> swapChainImageViews;
 
     [[nodiscard]] GLFWwindow* create_window() const;
 
@@ -66,6 +67,9 @@ private:
     void pick_physical_device();
     void create_logical_device();
     void create_surface();
+    void create_swapchain();
+    void create_image_views();
+    void create_graphics_pipeline();
 
 };
 

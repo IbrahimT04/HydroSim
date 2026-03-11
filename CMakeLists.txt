@@ -7,7 +7,8 @@ add_executable(HydroSim src/main.cpp
         src/VulkanEngine.cpp
         src/logging.h
         src/instance_helpers.h
-        src/device_helpers.h)
+        src/device_helpers.h
+        src/swapchain_helpers.h)
 
 # Pick a standard your compiler supports
 set_property(TARGET HydroSim PROPERTY CXX_STANDARD 23)
