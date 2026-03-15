@@ -70,6 +70,7 @@ private:
     void create_swapchain();
     void create_image_views();
     void create_graphics_pipeline();
+    [[nodiscard]] vk::raii::ShaderModule create_shader_module(const std::vector<char>& code) const;
 
 };
 

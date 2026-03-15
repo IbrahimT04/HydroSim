@@ -6,6 +6,7 @@
 #include "instance_helpers.h"
 #include "logging.h"
 #include "device_helpers.h"
+#include "shader_loader.h"
 #include "swapchain_helpers.h"
 
 VulkanEngine::VulkanEngine(const int window_width, const int window_height, const std::string &engine_name) {
@@ -89,7 +90,6 @@ void VulkanEngine::create_surface() {
 }
 
 void VulkanEngine::create_swapchain() {
-
     const vk::SurfaceCapabilitiesKHR surfaceCapabilities = physicalDevice.getSurfaceCapabilitiesKHR(*surface);
     swapchainExtent = vkSwapchain::choose_swapchain_extent(surfaceCapabilities, window);
 
@@ -113,25 +113,57 @@ void VulkanEngine::create_swapchain() {
         .presentMode = vkSwapchain::choose_swapchain_present_mode(availablePresentModes),
         .clipped = true
     };
-    swapchain       = vk::raii::SwapchainKHR( device, swapChainCreateInfo );
+    swapchain = vk::raii::SwapchainKHR(device, swapChainCreateInfo);
     swapchainImages = swapchain.getImages();
 }
 
 void VulkanEngine::create_image_views() {
     assert(swapChainImageViews.empty());
 
-    vk::ImageViewCreateInfo imageViewCreateInfo{ .viewType         = vk::ImageViewType::e2D,
-                                                 .format           = swapchainSurfaceFormat.format,
-                                                 .subresourceRange = { vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 } };
-    for (const auto &image : swapchainImages)
-    {
+    vk::ImageViewCreateInfo imageViewCreateInfo{
+        .viewType = vk::ImageViewType::e2D,
+        .format = swapchainSurfaceFormat.format,
+        .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}
+    };
+    for (const auto &image: swapchainImages) {
         imageViewCreateInfo.image = image;
-        swapChainImageViews.emplace_back( device, imageViewCreateInfo );
+        swapChainImageViews.emplace_back(device, imageViewCreateInfo);
     }
 }
 
-void VulkanEngine::create_graphics_pipeline() {
+vk::raii::ShaderModule VulkanEngine::create_shader_module(const std::vector<char> &code) const {
+    const vk::ShaderModuleCreateInfo createInfo{
+        .codeSize = code.size() * sizeof(char), .pCode = reinterpret_cast<const uint32_t *>(code.data())
+    };
+    vk::raii::ShaderModule shaderModule{device, createInfo};
+    return shaderModule;
+}
 
+void VulkanEngine::create_graphics_pipeline() {
+    vk::raii::ShaderModule shaderModule = create_shader_module(vkSlang::readFile("shaders/slang.spv"));
+
+    const vk::PipelineShaderStageCreateInfo vertShaderStageInfo{
+        .stage = vk::ShaderStageFlagBits::eVertex, .module = shaderModule, .pName = "vertMain"
+    };
+
+    const vk::PipelineShaderStageCreateInfo fragShaderStageInfo{
+        .stage = vk::ShaderStageFlagBits::eFragment, .module = shaderModule, .pName = "fragMain"
+    };
+
+    vk::PipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
+
+    std::vector dynamicStates = {
+        vk::DynamicState::eViewport,
+        vk::DynamicState::eScissor
+    };
+
+    vk::PipelineDynamicStateCreateInfo dynamicState{
+        .dynamicStateCount = static_cast<uint32_t>(dynamicStates.size()), .pDynamicStates = dynamicStates.data()
+    };
+
+    vk::PipelineVertexInputStateCreateInfo vertexInputInfo;
+
+    vk::PipelineInputAssemblyStateCreateInfo inputAssembly{.topology = vk::PrimitiveTopology::eTriangleList};
 }
 
 VulkanEngine::~VulkanEngine() {

@@ -8,7 +8,8 @@ add_executable(HydroSim src/main.cpp
         src/logging.h
         src/instance_helpers.h
         src/device_helpers.h
-        src/swapchain_helpers.h)
+        src/swapchain_helpers.h
+        src/shader_loader.h)
 
 # Pick a standard your compiler supports
 set_property(TARGET HydroSim PROPERTY CXX_STANDARD 23)
@@ -31,5 +32,53 @@ target_link_libraries(HydroSim PRIVATE glm::glm)
 # Link against targets (brings include dirs automatically)
 target_link_libraries(HydroSim PRIVATE Vulkan::Vulkan glfw)
 
-add_custom_target(Shaders ALL DEPENDS ${SHADER_OUTPUTS})
-add_dependencies(HydroSim Shaders)
+function(add_slang_shader_target TARGET)
+    cmake_parse_arguments(SHADER "" "SOURCE;OUTPUT" "ENTRY_POINTS;INCLUDE_DIRS" ${ARGN})
+
+    if (NOT SHADER_SOURCE)
+        message(FATAL_ERROR "add_slang_shader_target: SOURCE is required")
+    endif()
+
+    if (NOT SHADER_OUTPUT)
+        set(SHADER_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/shaders/${TARGET}.spv")
+    endif()
+
+    get_filename_component(OUT_DIR "${SHADER_OUTPUT}" DIRECTORY)
+
+    set(SLANG_ARGS
+            "${SHADER_SOURCE}"
+            -target spirv
+            -profile spirv_1_4
+            -fvk-use-entrypoint-name
+            -o "${SHADER_OUTPUT}"
+    )
+
+    # Optional: redundant today, but harmless if you want to be explicit
+    # list(APPEND SLANG_ARGS -emit-spirv-directly)
+
+    foreach(ENTRY IN LISTS SHADER_ENTRY_POINTS)
+        list(APPEND SLANG_ARGS -entry "${ENTRY}")
+    endforeach()
+
+    foreach(INC IN LISTS SHADER_INCLUDE_DIRS)
+        list(APPEND SLANG_ARGS -I "${INC}")
+    endforeach()
+
+    add_custom_command(
+            OUTPUT "${SHADER_OUTPUT}"
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${OUT_DIR}"
+            COMMAND "${SLANGC_EXECUTABLE}" ${SLANG_ARGS}
+            DEPENDS "${SHADER_SOURCE}"
+            COMMENT "Compiling Slang shader module ${SHADER_SOURCE} -> ${SHADER_OUTPUT}"
+            VERBATIM
+    )
+
+    add_custom_target(${TARGET} ALL DEPENDS "${SHADER_OUTPUT}")
+endfunction()
+
+add_slang_shader_target(HydroSimShaders
+        SOURCE "${CMAKE_SOURCE_DIR}/src/shaders/default.slang"
+        OUTPUT "${CMAKE_BINARY_DIR}/spir_v_shaders/default.slang.spv"
+        ENTRY_POINTS vertMain fragMain
+)
+add_dependencies(HydroSim HydroSimShaders)
