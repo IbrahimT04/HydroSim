@@ -60,6 +60,10 @@ private:
     vk::Extent2D swapchainExtent {};
     std::vector<vk::raii::ImageView> swapChainImageViews;
 
+    // Pipeline Objects
+    vk::raii::PipelineLayout pipelineLayout {nullptr};
+    vk::raii::Pipeline graphicsPipeline {nullptr};
+
     [[nodiscard]] GLFWwindow* create_window() const;
 
     vk::raii::Instance create_instance();

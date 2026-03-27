@@ -140,7 +140,7 @@ vk::raii::ShaderModule VulkanEngine::create_shader_module(const std::vector<char
 }
 
 void VulkanEngine::create_graphics_pipeline() {
-    vk::raii::ShaderModule shaderModule = create_shader_module(vkSlang::readFile("shaders/slang.spv"));
+    const vk::raii::ShaderModule shaderModule = create_shader_module(vkSlang::readFile("shaders/slang.spv"));
 
     const vk::PipelineShaderStageCreateInfo vertShaderStageInfo{
         .stage = vk::ShaderStageFlagBits::eVertex, .module = shaderModule, .pName = "vertMain"
@@ -164,6 +164,76 @@ void VulkanEngine::create_graphics_pipeline() {
     vk::PipelineVertexInputStateCreateInfo vertexInputInfo;
 
     vk::PipelineInputAssemblyStateCreateInfo inputAssembly{.topology = vk::PrimitiveTopology::eTriangleList};
+
+    auto viewport = vk::Viewport{
+        0.0f, 0.0f, static_cast<float>(swapchainExtent.width),
+        static_cast<float>(swapchainExtent.height), 0.0f, 1.0f
+    };
+    auto rect = vk::Rect2D{ vk::Offset2D{ 0, 0 }, swapchainExtent };
+
+    vk::PipelineViewportStateCreateInfo viewportState{ .viewportCount = 1, .scissorCount = 1 };
+
+    vk::PipelineRasterizationStateCreateInfo rasterizer{
+        .depthClampEnable = VK_FALSE,
+        .rasterizerDiscardEnable = VK_FALSE,
+        .polygonMode = vk::PolygonMode::eFill,
+        .cullMode = vk::CullModeFlagBits::eBack,
+        .frontFace = vk::FrontFace::eClockwise,
+        .depthBiasEnable = VK_FALSE,
+        .lineWidth = 1.0f
+    };
+
+    vk::PipelineMultisampleStateCreateInfo multisampling{
+        .rasterizationSamples = vk::SampleCountFlagBits::e1,
+        .sampleShadingEnable = VK_FALSE
+    };
+
+    vk::PipelineColorBlendAttachmentState colorBlendAttachment{
+        .blendEnable = VK_FALSE,
+        .colorWriteMask =
+            vk::ColorComponentFlagBits::eR |
+            vk::ColorComponentFlagBits::eG |
+            vk::ColorComponentFlagBits::eB |
+            vk::ColorComponentFlagBits::eA
+    };
+
+    vk::PipelineColorBlendStateCreateInfo colorBlending{
+        .logicOpEnable = VK_FALSE,
+        .logicOp = vk::LogicOp::eCopy,
+        .attachmentCount = 1,
+        .pAttachments = &colorBlendAttachment
+    };
+
+    vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
+        .setLayoutCount = 0,
+        .pushConstantRangeCount = 0
+    };
+
+    // pipelineLayout should be a class member
+    pipelineLayout = vk::raii::PipelineLayout(device, pipelineLayoutInfo);
+
+    vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo{ .colorAttachmentCount = 1, .pColorAttachmentFormats = &swapchainSurfaceFormat.format };
+
+    vk::GraphicsPipelineCreateInfo pipelineInfo{
+        .stageCount = 2,
+        .pStages = shaderStages,
+        .pVertexInputState = &vertexInputInfo,
+        .pInputAssemblyState = &inputAssembly,
+        .pViewportState = &viewportState,
+        .pRasterizationState = &rasterizer,
+        .pMultisampleState = &multisampling,
+        .pDepthStencilState = nullptr,
+        .pColorBlendState = &colorBlending,
+        .pDynamicState = &dynamicState,
+        .layout = *pipelineLayout,
+        .renderPass = nullptr,
+        .subpass = 0
+    };
+    // Optional
+    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+    pipelineInfo.basePipelineIndex = -1;
+
+    graphicsPipeline = vk::raii::Pipeline(device, nullptr, pipelineInfo);
 }
 
 VulkanEngine::~VulkanEngine() {
