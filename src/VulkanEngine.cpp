@@ -24,6 +24,9 @@ VulkanEngine::VulkanEngine(const int window_width, const int window_height, cons
     create_swapchain();
     create_image_views();
     create_graphics_pipeline();
+    create_command_pool();
+    create_command_buffer();
+    create_synchronization_objects();
 }
 
 GLFWwindow *VulkanEngine::create_window() const {
@@ -140,17 +143,24 @@ vk::raii::ShaderModule VulkanEngine::create_shader_module(const std::vector<char
 }
 
 void VulkanEngine::create_graphics_pipeline() {
-    const vk::raii::ShaderModule shaderModule = create_shader_module(vkSlang::readFile("shaders/slang.spv"));
+    const vk::raii::ShaderModule shaderModule =
+        create_shader_module(vkSlang::readFile("spir_v_shaders/default.spv"));
 
     const vk::PipelineShaderStageCreateInfo vertShaderStageInfo{
-        .stage = vk::ShaderStageFlagBits::eVertex, .module = shaderModule, .pName = "vertMain"
+        .stage = vk::ShaderStageFlagBits::eVertex,
+        .module = shaderModule,
+        .pName = "vertMain"
     };
 
     const vk::PipelineShaderStageCreateInfo fragShaderStageInfo{
-        .stage = vk::ShaderStageFlagBits::eFragment, .module = shaderModule, .pName = "fragMain"
+        .stage = vk::ShaderStageFlagBits::eFragment,
+        .module = shaderModule,
+        .pName = "fragMain"
     };
 
-    vk::PipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
+    vk::PipelineShaderStageCreateInfo shaderStages[] = {
+        vertShaderStageInfo, fragShaderStageInfo
+    };
 
     std::vector dynamicStates = {
         vk::DynamicState::eViewport,
@@ -158,22 +168,22 @@ void VulkanEngine::create_graphics_pipeline() {
     };
 
     vk::PipelineDynamicStateCreateInfo dynamicState{
-        .dynamicStateCount = static_cast<uint32_t>(dynamicStates.size()), .pDynamicStates = dynamicStates.data()
+        .dynamicStateCount = static_cast<uint32_t>(dynamicStates.size()),
+        .pDynamicStates = dynamicStates.data()
     };
 
-    vk::PipelineVertexInputStateCreateInfo vertexInputInfo;
+    constexpr vk::PipelineVertexInputStateCreateInfo vertexInputInfo{};
 
-    vk::PipelineInputAssemblyStateCreateInfo inputAssembly{.topology = vk::PrimitiveTopology::eTriangleList};
-
-    auto viewport = vk::Viewport{
-        0.0f, 0.0f, static_cast<float>(swapchainExtent.width),
-        static_cast<float>(swapchainExtent.height), 0.0f, 1.0f
+    constexpr vk::PipelineInputAssemblyStateCreateInfo inputAssembly{
+        .topology = vk::PrimitiveTopology::eTriangleList
     };
-    auto rect = vk::Rect2D{ vk::Offset2D{ 0, 0 }, swapchainExtent };
 
-    vk::PipelineViewportStateCreateInfo viewportState{ .viewportCount = 1, .scissorCount = 1 };
+    constexpr vk::PipelineViewportStateCreateInfo viewportState{
+        .viewportCount = 1,
+        .scissorCount = 1
+    };
 
-    vk::PipelineRasterizationStateCreateInfo rasterizer{
+    constexpr vk::PipelineRasterizationStateCreateInfo rasterizer{
         .depthClampEnable = VK_FALSE,
         .rasterizerDiscardEnable = VK_FALSE,
         .polygonMode = vk::PolygonMode::eFill,
@@ -183,12 +193,12 @@ void VulkanEngine::create_graphics_pipeline() {
         .lineWidth = 1.0f
     };
 
-    vk::PipelineMultisampleStateCreateInfo multisampling{
+    constexpr vk::PipelineMultisampleStateCreateInfo multisampling{
         .rasterizationSamples = vk::SampleCountFlagBits::e1,
         .sampleShadingEnable = VK_FALSE
     };
 
-    vk::PipelineColorBlendAttachmentState colorBlendAttachment{
+    constexpr vk::PipelineColorBlendAttachmentState colorBlendAttachment{
         .blendEnable = VK_FALSE,
         .colorWriteMask =
             vk::ColorComponentFlagBits::eR |
@@ -197,24 +207,30 @@ void VulkanEngine::create_graphics_pipeline() {
             vk::ColorComponentFlagBits::eA
     };
 
-    vk::PipelineColorBlendStateCreateInfo colorBlending{
+    const vk::PipelineColorBlendStateCreateInfo colorBlending{
         .logicOpEnable = VK_FALSE,
         .logicOp = vk::LogicOp::eCopy,
         .attachmentCount = 1,
         .pAttachments = &colorBlendAttachment
     };
 
-    vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
+    constexpr vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
         .setLayoutCount = 0,
         .pushConstantRangeCount = 0
     };
 
-    // pipelineLayout should be a class member
     pipelineLayout = vk::raii::PipelineLayout(device, pipelineLayoutInfo);
 
-    vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo{ .colorAttachmentCount = 1, .pColorAttachmentFormats = &swapchainSurfaceFormat.format };
+    const vk::Format colorFormat = swapchainSurfaceFormat.format;
+    const vk::PipelineRenderingCreateInfo renderingInfo{
+        .colorAttachmentCount = 1,
+        .pColorAttachmentFormats = &colorFormat,
+        .depthAttachmentFormat = vk::Format::eUndefined,
+        .stencilAttachmentFormat = vk::Format::eUndefined
+    };
 
     vk::GraphicsPipelineCreateInfo pipelineInfo{
+        .pNext = &renderingInfo,
         .stageCount = 2,
         .pStages = shaderStages,
         .pVertexInputState = &vertexInputInfo,
@@ -222,18 +238,134 @@ void VulkanEngine::create_graphics_pipeline() {
         .pViewportState = &viewportState,
         .pRasterizationState = &rasterizer,
         .pMultisampleState = &multisampling,
-        .pDepthStencilState = nullptr,
+        .pDepthStencilState = VK_NULL_HANDLE,
         .pColorBlendState = &colorBlending,
         .pDynamicState = &dynamicState,
         .layout = *pipelineLayout,
-        .renderPass = nullptr,
+        .renderPass = VK_NULL_HANDLE,
         .subpass = 0
     };
-    // Optional
-    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
-    pipelineInfo.basePipelineIndex = -1;
 
-    graphicsPipeline = vk::raii::Pipeline(device, nullptr, pipelineInfo);
+    graphicsPipeline = vk::raii::Pipeline(device, VK_NULL_HANDLE, pipelineInfo);
+}
+
+void VulkanEngine::create_command_pool() {
+    const vk::CommandPoolCreateInfo poolInfo {
+        .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+        .queueFamilyIndex =  vkDevice::get_queue_index(physicalDevice, surface)
+    };
+    commandPool = vk::raii::CommandPool(device, poolInfo);
+}
+
+void VulkanEngine::create_command_buffer() {
+    const vk::CommandBufferAllocateInfo allocInfo{
+        .commandPool = commandPool,
+        .level = vk::CommandBufferLevel::ePrimary,
+        .commandBufferCount = 1
+    };
+    commandBuffer = std::move(vk::raii::CommandBuffers(device, allocInfo).front());
+}
+
+void VulkanEngine::create_synchronization_objects() {
+    presentCompleteSemaphore = vk::raii::Semaphore(device, vk::SemaphoreCreateInfo());
+    renderFinishedSemaphore = vk::raii::Semaphore(device, vk::SemaphoreCreateInfo());
+    drawFence = vk::raii::Fence(device, {.flags = vk::FenceCreateFlagBits::eSignaled});
+}
+
+void VulkanEngine::transition_image_layout(
+    const uint32_t imageIndex,
+    const vk::ImageLayout oldLayout,
+    const vk::ImageLayout newLayout,
+    const vk::AccessFlags2 srcAccessMask,
+    const vk::AccessFlags2 dstAccessMask,
+    const vk::PipelineStageFlags2 srcStageMask,
+    const vk::PipelineStageFlags2 dstStageMask
+) const {
+    vk::ImageMemoryBarrier2 barrier = {
+        .srcStageMask = srcStageMask,
+        .srcAccessMask = srcAccessMask,
+        .dstStageMask = dstStageMask,
+        .dstAccessMask = dstAccessMask,
+        .oldLayout = oldLayout,
+        .newLayout = newLayout,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .image = swapchainImages[imageIndex],
+        .subresourceRange = {
+            .aspectMask = vk::ImageAspectFlagBits::eColor,
+            .baseMipLevel = 0,
+            .levelCount = 1,
+            .baseArrayLayer = 0,
+            .layerCount = 1
+        }
+    };
+    const vk::DependencyInfo dependencyInfo = {
+        .dependencyFlags = {},
+        .imageMemoryBarrierCount = 1,
+        .pImageMemoryBarriers = &barrier
+    };
+    commandBuffer.pipelineBarrier2(dependencyInfo);
+}
+
+void VulkanEngine::record_command_buffer(const uint32_t imageIndex) const {
+    commandBuffer.begin({});
+
+    // Transition the image layout for rendering
+    transition_image_layout(
+        imageIndex,
+        vk::ImageLayout::eUndefined,
+        vk::ImageLayout::eColorAttachmentOptimal,
+        {},
+        vk::AccessFlagBits2::eColorAttachmentWrite,
+        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        vk::PipelineStageFlagBits2::eColorAttachmentOutput
+    );
+
+    // Set up the color attachment
+    constexpr vk::ClearValue clearColor = vk::ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f);
+    vk::RenderingAttachmentInfo attachmentInfo = {
+        .imageView = swapChainImageViews[imageIndex],
+        .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+        .loadOp = vk::AttachmentLoadOp::eClear,
+        .storeOp = vk::AttachmentStoreOp::eStore,
+        .clearValue = clearColor
+    };
+
+    // Set up the rendering info
+    const vk::RenderingInfo renderingInfo = {
+        .renderArea = { .offset = { 0, 0 }, .extent = swapchainExtent },
+        .layerCount = 1,
+        .colorAttachmentCount = 1,
+        .pColorAttachments = &attachmentInfo
+    };
+
+    // Begin rendering
+    commandBuffer.beginRendering(renderingInfo);
+
+    // Rendering commands will go here
+    commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
+    commandBuffer.setViewport(0, vk::Viewport(0.0f, 0.0f,
+        static_cast<float>(swapchainExtent.width),
+        static_cast<float>(swapchainExtent.height),
+        0.0f, 1.0f));
+    commandBuffer.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), swapchainExtent));
+    commandBuffer.draw(3, 1, 0, 0);
+
+    // End rendering
+    commandBuffer.endRendering();
+
+    // Transition the image layout for presentation
+    transition_image_layout(
+        imageIndex,
+        vk::ImageLayout::eColorAttachmentOptimal,
+        vk::ImageLayout::ePresentSrcKHR,
+        vk::AccessFlagBits2::eColorAttachmentWrite,
+        {},
+        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        vk::PipelineStageFlagBits2::eBottomOfPipe
+    );
+
+    commandBuffer.end();
 }
 
 VulkanEngine::~VulkanEngine() {

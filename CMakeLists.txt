@@ -32,6 +32,11 @@ target_link_libraries(HydroSim PRIVATE glm::glm)
 # Link against targets (brings include dirs automatically)
 target_link_libraries(HydroSim PRIVATE Vulkan::Vulkan glfw)
 
+find_program(SLANGC_EXECUTABLE NAMES slangc REQUIRED)
+message(STATUS "Using slangc: ${SLANGC_EXECUTABLE}")
+
+file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/spir_v_shaders")
+
 function(add_slang_shader_target TARGET)
     cmake_parse_arguments(SHADER "" "SOURCE;OUTPUT" "ENTRY_POINTS;INCLUDE_DIRS" ${ARGN})
 
@@ -52,9 +57,6 @@ function(add_slang_shader_target TARGET)
             -fvk-use-entrypoint-name
             -o "${SHADER_OUTPUT}"
     )
-
-    # Optional: redundant today, but harmless if you want to be explicit
-    # list(APPEND SLANG_ARGS -emit-spirv-directly)
 
     foreach(ENTRY IN LISTS SHADER_ENTRY_POINTS)
         list(APPEND SLANG_ARGS -entry "${ENTRY}")
@@ -78,7 +80,8 @@ endfunction()
 
 add_slang_shader_target(HydroSimShaders
         SOURCE "${CMAKE_SOURCE_DIR}/src/shaders/default.slang"
-        OUTPUT "${CMAKE_BINARY_DIR}/spir_v_shaders/default.slang.spv"
+        OUTPUT "${CMAKE_BINARY_DIR}/spir_v_shaders/default.spv"
         ENTRY_POINTS vertMain fragMain
 )
+
 add_dependencies(HydroSim HydroSimShaders)

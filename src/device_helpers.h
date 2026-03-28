@@ -37,10 +37,14 @@ namespace vkDevice {
 
         // Check if the physicalDevice supports the required features (dynamic rendering and extended dynamic state)
         auto features =
-                physicalDevice
-                .getFeatures2<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan13Features,
+                physicalDevice.getFeatures2<
+                    vk::PhysicalDeviceFeatures2,
+                    vk::PhysicalDeviceVulkan11Features,
+                    vk::PhysicalDeviceVulkan13Features,
                     vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>();
-        bool supportsRequiredFeatures = features.get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering &&
+
+        bool supportsRequiredFeatures = features.get<vk::PhysicalDeviceVulkan11Features>().shaderDrawParameters &&
+                                        features.get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering &&
                                         features.get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>().
                                         extendedDynamicState;
 
@@ -103,9 +107,11 @@ namespace vkDevice {
 
         // Create a chain of feature structures
         vk::StructureChain<vk::PhysicalDeviceFeatures2,
+            vk::PhysicalDeviceVulkan11Features,
             vk::PhysicalDeviceVulkan13Features,
             vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> featureChain = {
             {}, // vk::PhysicalDeviceFeatures2 (empty for now)
+            {.shaderDrawParameters = true},
             {.dynamicRendering = true}, // Enable dynamic rendering from Vulkan 1.3
             {.extendedDynamicState = true} // Enable extended dynamic state from the extension
         };
@@ -118,7 +124,7 @@ namespace vkDevice {
             .ppEnabledExtensionNames = requiredDeviceExtension.data()
         };
 
-        return vk::raii::Device(physical_device, deviceCreateInfo);
+        return {physical_device, deviceCreateInfo};
     }
 }
 #endif //HYDROSIM_DEVICE_HELPERS_H
