@@ -45,6 +45,7 @@ namespace vkDevice {
 
         bool supportsRequiredFeatures = features.get<vk::PhysicalDeviceVulkan11Features>().shaderDrawParameters &&
                                         features.get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering &&
+                                        features.get<vk::PhysicalDeviceVulkan13Features>().synchronization2 &&
                                         features.get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>().
                                         extendedDynamicState;
 
@@ -111,9 +112,9 @@ namespace vkDevice {
             vk::PhysicalDeviceVulkan13Features,
             vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> featureChain = {
             {}, // vk::PhysicalDeviceFeatures2 (empty for now)
-            {.shaderDrawParameters = true},
-            {.dynamicRendering = true}, // Enable dynamic rendering from Vulkan 1.3
-            {.extendedDynamicState = true} // Enable extended dynamic state from the extension
+            {.shaderDrawParameters = VK_TRUE},
+            {.synchronization2 = VK_TRUE, .dynamicRendering = VK_TRUE}, // Enable dynamic rendering from Vulkan 1.3
+            {.extendedDynamicState = VK_TRUE} // Enable extended dynamic state from the extension
         };
 
         vk::DeviceCreateInfo deviceCreateInfo{

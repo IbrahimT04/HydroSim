@@ -9,7 +9,7 @@
 
 int main() {
 
-    const auto engine = VulkanEngine();
+    auto engine = VulkanEngine();
     engine.run();
 
     return 0;

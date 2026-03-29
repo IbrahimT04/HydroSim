@@ -25,7 +25,7 @@ VulkanEngine::VulkanEngine(const int window_width, const int window_height, cons
     create_image_views();
     create_graphics_pipeline();
     create_command_pool();
-    create_command_buffer();
+    create_command_buffers();
     create_synchronization_objects();
 }
 
@@ -257,19 +257,26 @@ void VulkanEngine::create_command_pool() {
     commandPool = vk::raii::CommandPool(device, poolInfo);
 }
 
-void VulkanEngine::create_command_buffer() {
-    const vk::CommandBufferAllocateInfo allocInfo{
-        .commandPool = commandPool,
-        .level = vk::CommandBufferLevel::ePrimary,
-        .commandBufferCount = 1
-    };
-    commandBuffer = std::move(vk::raii::CommandBuffers(device, allocInfo).front());
+void VulkanEngine::create_command_buffers() {
+    commandBuffers.clear();
+    vk::CommandBufferAllocateInfo allocInfo{ .commandPool = commandPool, .level = vk::CommandBufferLevel::ePrimary,
+                                           .commandBufferCount = MAX_FRAMES_IN_FLIGHT };
+    commandBuffers = vk::raii::CommandBuffers( device, allocInfo );
 }
 
 void VulkanEngine::create_synchronization_objects() {
-    presentCompleteSemaphore = vk::raii::Semaphore(device, vk::SemaphoreCreateInfo());
-    renderFinishedSemaphore = vk::raii::Semaphore(device, vk::SemaphoreCreateInfo());
-    drawFence = vk::raii::Fence(device, {.flags = vk::FenceCreateFlagBits::eSignaled});
+    assert(presentCompleteSemaphores.empty() && renderFinishedSemaphores.empty() && inFlightFences.empty());
+
+    for (size_t i = 0; i < swapchainImages.size(); i++)
+    {
+        renderFinishedSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
+    }
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        presentCompleteSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
+        inFlightFences.emplace_back(device, vk::FenceCreateInfo{.flags = vk::FenceCreateFlagBits::eSignaled});
+    }
 }
 
 void VulkanEngine::transition_image_layout(
@@ -304,10 +311,11 @@ void VulkanEngine::transition_image_layout(
         .imageMemoryBarrierCount = 1,
         .pImageMemoryBarriers = &barrier
     };
-    commandBuffer.pipelineBarrier2(dependencyInfo);
+    commandBuffers[frameIndex].pipelineBarrier2(dependencyInfo);
 }
 
 void VulkanEngine::record_command_buffer(const uint32_t imageIndex) const {
+    const auto &commandBuffer = commandBuffers[frameIndex];
     commandBuffer.begin({});
 
     // Transition the image layout for rendering

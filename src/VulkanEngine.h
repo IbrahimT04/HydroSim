@@ -14,7 +14,7 @@ public:
 
     ~VulkanEngine();
 
-    void run() const {
+    void run() {
         while (!glfwWindowShouldClose(window)) {
             glfwPollEvents();
             drawFrame();
@@ -22,38 +22,45 @@ public:
         device.waitIdle();
     }
 
-    void drawFrame() const {
-        auto fenceResult = device.waitForFences(*drawFence, vk::True, UINT64_MAX);
+    void drawFrame() {
+        if (const auto fenceResult = device.waitForFences(*inFlightFences[frameIndex], vk::True, UINT64_MAX);
+            fenceResult != vk::Result::eSuccess) {
+            throw std::runtime_error("failed to wait for fence!");
+        }
+        device.resetFences(*inFlightFences[frameIndex]);
+
         auto [result, imageIndex] = swapchain.acquireNextImage(
-            UINT64_MAX,
-            *presentCompleteSemaphore,
-            nullptr);
+            UINT64_MAX, *presentCompleteSemaphores[frameIndex], nullptr);
+
+        commandBuffers[frameIndex].reset();
         record_command_buffer(imageIndex);
-        device.resetFences(*drawFence);
 
         vk::PipelineStageFlags waitDestinationStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
         const vk::SubmitInfo submitInfo{
             .waitSemaphoreCount = 1,
-            .pWaitSemaphores = &*presentCompleteSemaphore,
+            .pWaitSemaphores = &*presentCompleteSemaphores[frameIndex],
             .pWaitDstStageMask = &waitDestinationStageMask,
             .commandBufferCount = 1,
-            .pCommandBuffers = &*commandBuffer,
+            .pCommandBuffers = &*commandBuffers[frameIndex],
             .signalSemaphoreCount = 1,
-            .pSignalSemaphores = &*renderFinishedSemaphore
+            .pSignalSemaphores = &*renderFinishedSemaphores[imageIndex]
         };
-
-        queue.submit(submitInfo, *drawFence);
-
+        queue.submit(submitInfo, *inFlightFences[frameIndex]);
 
         const vk::PresentInfoKHR presentInfoKHR{
             .waitSemaphoreCount = 1,
-            .pWaitSemaphores = &*renderFinishedSemaphore,
+            .pWaitSemaphores = &*renderFinishedSemaphores[imageIndex],
             .swapchainCount = 1,
             .pSwapchains = &*swapchain,
-            .pImageIndices = &imageIndex
-        };
+            .pImageIndices = &imageIndex};
 
         result = queue.presentKHR(presentInfoKHR);
+
+        if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
+            throw std::runtime_error("failed to present swapchain image!");
+        }
+
+        frameIndex = (frameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 
 private:
@@ -101,12 +108,16 @@ private:
 
     // Command Objects
     vk::raii::CommandPool commandPool{VK_NULL_HANDLE};
-    vk::raii::CommandBuffer commandBuffer{VK_NULL_HANDLE};
+    std::vector<vk::raii::CommandBuffer> commandBuffers;
 
-    // Synchronisation
-    vk::raii::Semaphore presentCompleteSemaphore{VK_NULL_HANDLE};
-    vk::raii::Semaphore renderFinishedSemaphore{VK_NULL_HANDLE};
-    vk::raii::Fence drawFence{VK_NULL_HANDLE};
+    // Synchronisation Objects
+    std::vector<vk::raii::Semaphore> presentCompleteSemaphores;
+    std::vector<vk::raii::Semaphore> renderFinishedSemaphores;
+    std::vector<vk::raii::Fence> inFlightFences;
+
+    // Frame Objects
+    static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+    uint32_t frameIndex{0};
 
     [[nodiscard]] GLFWwindow *create_window() const;
 
@@ -130,7 +141,7 @@ private:
 
     void create_command_pool();
 
-    void create_command_buffer();
+    void create_command_buffers();
 
     void create_synchronization_objects();
 
