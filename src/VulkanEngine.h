@@ -27,10 +27,22 @@ public:
             fenceResult != vk::Result::eSuccess) {
             throw std::runtime_error("failed to wait for fence!");
         }
-        device.resetFences(*inFlightFences[frameIndex]);
 
         auto [result, imageIndex] = swapchain.acquireNextImage(
             UINT64_MAX, *presentCompleteSemaphores[frameIndex], nullptr);
+
+        if (result == vk::Result::eErrorOutOfDateKHR)
+        {
+            recreate_swapchain();
+            return;
+        }
+        if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR)
+        {
+            assert(result == vk::Result::eTimeout || result == vk::Result::eNotReady);
+            throw std::runtime_error("failed to acquire swap chain image!");
+        }
+
+        device.resetFences(*inFlightFences[frameIndex]);
 
         commandBuffers[frameIndex].reset();
         record_command_buffer(imageIndex);
@@ -56,10 +68,16 @@ public:
 
         result = queue.presentKHR(presentInfoKHR);
 
-        if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
-            throw std::runtime_error("failed to present swapchain image!");
+        if ((result == vk::Result::eSuboptimalKHR) || (result == vk::Result::eErrorOutOfDateKHR) || framebufferResized)
+        {
+            framebufferResized = false;
+            recreate_swapchain();
         }
-
+        else
+        {
+            // There are no other success codes than eSuccess; on any error code, presentKHR already threw an exception.
+            assert(result == vk::Result::eSuccess);
+        }
         frameIndex = (frameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 
@@ -100,7 +118,7 @@ private:
     std::vector<vk::Image> swapchainImages;
     vk::SurfaceFormatKHR swapchainSurfaceFormat{};
     vk::Extent2D swapchainExtent{};
-    std::vector<vk::raii::ImageView> swapChainImageViews;
+    std::vector<vk::raii::ImageView> swapchainImageViews;
 
     // Pipeline Objects
     vk::raii::PipelineLayout pipelineLayout{VK_NULL_HANDLE};
@@ -118,8 +136,11 @@ private:
     // Frame Objects
     static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
     uint32_t frameIndex{0};
+    bool framebufferResized = false;
 
-    [[nodiscard]] GLFWwindow *create_window() const;
+    void create_window();
+
+    static void framebuffer_resize_callback(GLFWwindow *window, int width, int height);
 
     vk::raii::Instance create_instance();
 
@@ -155,6 +176,9 @@ private:
         vk::PipelineStageFlags2 dstStageMask) const;
 
     void record_command_buffer(uint32_t imageIndex) const;
+
+    void cleanup_swapchain();
+    void recreate_swapchain();
 };
 
 #endif //HYDROSIM_VULKANENGINE_H

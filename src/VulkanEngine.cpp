@@ -14,7 +14,7 @@ VulkanEngine::VulkanEngine(const int window_width, const int window_height, cons
     width = window_width;
     height = window_height;
 
-    window = create_window();
+    create_window();
     instance = create_instance();
     create_debugger();
     create_surface();
@@ -29,12 +29,19 @@ VulkanEngine::VulkanEngine(const int window_width, const int window_height, cons
     create_synchronization_objects();
 }
 
-GLFWwindow *VulkanEngine::create_window() const {
+void VulkanEngine::create_window() {
     glfwInit();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
-    return glfwCreateWindow(width, height, "Vulkan Window", nullptr, nullptr);
+    window = glfwCreateWindow(width, height, "Vulkan Window", nullptr, nullptr);
+    glfwSetWindowUserPointer(window, this);
+    glfwSetFramebufferSizeCallback(window, framebuffer_resize_callback);
+}
+
+void VulkanEngine::framebuffer_resize_callback(GLFWwindow* window, int width, int height) {
+    const auto app = reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
+    app->framebufferResized = true;
 }
 
 vk::raii::Instance VulkanEngine::create_instance() {
@@ -121,7 +128,7 @@ void VulkanEngine::create_swapchain() {
 }
 
 void VulkanEngine::create_image_views() {
-    assert(swapChainImageViews.empty());
+    assert(swapchainImageViews.empty());
 
     vk::ImageViewCreateInfo imageViewCreateInfo{
         .viewType = vk::ImageViewType::e2D,
@@ -130,7 +137,7 @@ void VulkanEngine::create_image_views() {
     };
     for (const auto &image: swapchainImages) {
         imageViewCreateInfo.image = image;
-        swapChainImageViews.emplace_back(device, imageViewCreateInfo);
+        swapchainImageViews.emplace_back(device, imageViewCreateInfo);
     }
 }
 
@@ -332,7 +339,7 @@ void VulkanEngine::record_command_buffer(const uint32_t imageIndex) const {
     // Set up the color attachment
     constexpr vk::ClearValue clearColor = vk::ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f);
     vk::RenderingAttachmentInfo attachmentInfo = {
-        .imageView = swapChainImageViews[imageIndex],
+        .imageView = swapchainImageViews[imageIndex],
         .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
         .loadOp = vk::AttachmentLoadOp::eClear,
         .storeOp = vk::AttachmentStoreOp::eStore,
@@ -376,8 +383,27 @@ void VulkanEngine::record_command_buffer(const uint32_t imageIndex) const {
     commandBuffer.end();
 }
 
-VulkanEngine::~VulkanEngine() {
-    glfwDestroyWindow(window);
+void VulkanEngine::cleanup_swapchain() {
+    swapchainImageViews.clear();
+    swapchain = nullptr;
+}
 
+void VulkanEngine::recreate_swapchain() {
+    glfwGetFramebufferSize(window, &width, &height);
+    while (width == 0 || height == 0) {
+        glfwGetFramebufferSize(window, &width, &height);
+        glfwWaitEvents();
+    }
+
+    device.waitIdle();
+    cleanup_swapchain();
+    create_swapchain();
+    create_image_views();
+}
+
+VulkanEngine::~VulkanEngine() {
+    cleanup_swapchain();
+
+    glfwDestroyWindow(window);
     glfwTerminate();
 }
