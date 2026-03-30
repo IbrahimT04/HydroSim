@@ -6,6 +6,7 @@
 #define HYDROSIM_VULKANENGINE_H
 
 #include "config.h"
+#include "buffer_helpers.h"
 
 class VulkanEngine {
 public:
@@ -133,6 +134,15 @@ private:
     std::vector<vk::raii::Semaphore> renderFinishedSemaphores;
     std::vector<vk::raii::Fence> inFlightFences;
 
+    // Vertex Objects
+    vk::raii::Buffer vertexBuffer {VK_NULL_HANDLE};
+    vk::raii::DeviceMemory vertexBufferMemory {VK_NULL_HANDLE};
+    const std::vector<vkBuffer::Vertex> vertices = {
+        {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+        {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+        {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+    };
+
     // Frame Objects
     static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
     uint32_t frameIndex{0};
@@ -161,6 +171,10 @@ private:
     void create_graphics_pipeline();
 
     void create_command_pool();
+
+    void create_vertex_buffers();
+
+    uint32_t find_memory_type(uint32_t typeFilter, vk::MemoryPropertyFlags properties) const;
 
     void create_command_buffers();
 

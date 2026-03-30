@@ -8,6 +8,7 @@
 #include "device_helpers.h"
 #include "shader_loader.h"
 #include "swapchain_helpers.h"
+#include "buffer_helpers.h"
 
 VulkanEngine::VulkanEngine(const int window_width, const int window_height, const std::string &engine_name) {
     name = engine_name;
@@ -25,6 +26,7 @@ VulkanEngine::VulkanEngine(const int window_width, const int window_height, cons
     create_image_views();
     create_graphics_pipeline();
     create_command_pool();
+    create_vertex_buffers();
     create_command_buffers();
     create_synchronization_objects();
 }
@@ -39,8 +41,8 @@ void VulkanEngine::create_window() {
     glfwSetFramebufferSizeCallback(window, framebuffer_resize_callback);
 }
 
-void VulkanEngine::framebuffer_resize_callback(GLFWwindow* window, int width, int height) {
-    const auto app = reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
+void VulkanEngine::framebuffer_resize_callback(GLFWwindow *window, int width, int height) {
+    const auto app = reinterpret_cast<VulkanEngine *>(glfwGetWindowUserPointer(window));
     app->framebufferResized = true;
 }
 
@@ -151,7 +153,7 @@ vk::raii::ShaderModule VulkanEngine::create_shader_module(const std::vector<char
 
 void VulkanEngine::create_graphics_pipeline() {
     const vk::raii::ShaderModule shaderModule =
-        create_shader_module(vkSlang::readFile("spir_v_shaders/default.spv"));
+            create_shader_module(vkSlang::readFile("spir_v_shaders/default.spv"));
 
     const vk::PipelineShaderStageCreateInfo vertShaderStageInfo{
         .stage = vk::ShaderStageFlagBits::eVertex,
@@ -179,7 +181,14 @@ void VulkanEngine::create_graphics_pipeline() {
         .pDynamicStates = dynamicStates.data()
     };
 
-    constexpr vk::PipelineVertexInputStateCreateInfo vertexInputInfo{};
+    auto bindingDescription = vkBuffer::Vertex::getBindingDescription();
+    auto attributeDescriptions = vkBuffer::Vertex::getAttributeDescriptions();
+    vk::PipelineVertexInputStateCreateInfo vertexInputInfo{
+        .vertexBindingDescriptionCount = 1,
+        .pVertexBindingDescriptions = &bindingDescription,
+        .vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size()),
+        .pVertexAttributeDescriptions = attributeDescriptions.data()
+    };
 
     constexpr vk::PipelineInputAssemblyStateCreateInfo inputAssembly{
         .topology = vk::PrimitiveTopology::eTriangleList
@@ -208,10 +217,10 @@ void VulkanEngine::create_graphics_pipeline() {
     constexpr vk::PipelineColorBlendAttachmentState colorBlendAttachment{
         .blendEnable = VK_FALSE,
         .colorWriteMask =
-            vk::ColorComponentFlagBits::eR |
-            vk::ColorComponentFlagBits::eG |
-            vk::ColorComponentFlagBits::eB |
-            vk::ColorComponentFlagBits::eA
+        vk::ColorComponentFlagBits::eR |
+        vk::ColorComponentFlagBits::eG |
+        vk::ColorComponentFlagBits::eB |
+        vk::ColorComponentFlagBits::eA
     };
 
     const vk::PipelineColorBlendStateCreateInfo colorBlending{
@@ -257,30 +266,67 @@ void VulkanEngine::create_graphics_pipeline() {
 }
 
 void VulkanEngine::create_command_pool() {
-    const vk::CommandPoolCreateInfo poolInfo {
+    const vk::CommandPoolCreateInfo poolInfo{
         .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-        .queueFamilyIndex =  vkDevice::get_queue_index(physicalDevice, surface)
+        .queueFamilyIndex = vkDevice::get_queue_index(physicalDevice, surface)
     };
     commandPool = vk::raii::CommandPool(device, poolInfo);
 }
 
+void VulkanEngine::create_vertex_buffers() {
+    const vk::BufferCreateInfo bufferInfo{
+        .size = sizeof(vertices[0]) * vertices.size(), .usage = vk::BufferUsageFlagBits::eVertexBuffer,
+        .sharingMode = vk::SharingMode::eExclusive
+    };
+    vertexBuffer = vk::raii::Buffer(device, bufferInfo);
+
+    const vk::MemoryRequirements memRequirements = vertexBuffer.getMemoryRequirements();
+
+    const vk::MemoryAllocateInfo memoryAllocateInfo{
+        .allocationSize = memRequirements.size,
+        .memoryTypeIndex = find_memory_type(memRequirements.memoryTypeBits,
+                                            vk::MemoryPropertyFlagBits::eHostVisible |
+                                            vk::MemoryPropertyFlagBits::eHostCoherent)
+    };
+
+    vertexBufferMemory = vk::raii::DeviceMemory( device, memoryAllocateInfo );
+
+    vertexBuffer.bindMemory( *vertexBufferMemory, 0 );
+
+    void* data = vertexBufferMemory.mapMemory(0, bufferInfo.size);
+    memcpy(data, vertices.data(), bufferInfo.size);
+    vertexBufferMemory.unmapMemory();
+}
+
+uint32_t VulkanEngine::find_memory_type(const uint32_t typeFilter, const vk::MemoryPropertyFlags properties) const {
+    const vk::PhysicalDeviceMemoryProperties memProperties = physicalDevice.getMemoryProperties();
+
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+        if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            return i;
+        }
+    }
+
+    throw std::runtime_error("failed to find suitable memory type!");
+}
+
 void VulkanEngine::create_command_buffers() {
     commandBuffers.clear();
-    vk::CommandBufferAllocateInfo allocInfo{ .commandPool = commandPool, .level = vk::CommandBufferLevel::ePrimary,
-                                           .commandBufferCount = MAX_FRAMES_IN_FLIGHT };
-    commandBuffers = vk::raii::CommandBuffers( device, allocInfo );
+    const vk::CommandBufferAllocateInfo allocInfo{
+        .commandPool = commandPool, .level = vk::CommandBufferLevel::ePrimary,
+        .commandBufferCount = MAX_FRAMES_IN_FLIGHT
+    };
+    commandBuffers = vk::raii::CommandBuffers(device, allocInfo);
 }
 
 void VulkanEngine::create_synchronization_objects() {
     assert(presentCompleteSemaphores.empty() && renderFinishedSemaphores.empty() && inFlightFences.empty());
 
-    for (size_t i = 0; i < swapchainImages.size(); i++)
-    {
+    for (size_t i = 0; i < swapchainImages.size(); i++) {
         renderFinishedSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
     }
 
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-    {
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         presentCompleteSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
         inFlightFences.emplace_back(device, vk::FenceCreateInfo{.flags = vk::FenceCreateFlagBits::eSignaled});
     }
@@ -348,7 +394,7 @@ void VulkanEngine::record_command_buffer(const uint32_t imageIndex) const {
 
     // Set up the rendering info
     const vk::RenderingInfo renderingInfo = {
-        .renderArea = { .offset = { 0, 0 }, .extent = swapchainExtent },
+        .renderArea = {.offset = {0, 0}, .extent = swapchainExtent},
         .layerCount = 1,
         .colorAttachmentCount = 1,
         .pColorAttachments = &attachmentInfo
@@ -360,10 +406,12 @@ void VulkanEngine::record_command_buffer(const uint32_t imageIndex) const {
     // Rendering commands will go here
     commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
     commandBuffer.setViewport(0, vk::Viewport(0.0f, 0.0f,
-        static_cast<float>(swapchainExtent.width),
-        static_cast<float>(swapchainExtent.height),
-        0.0f, 1.0f));
+                                              static_cast<float>(swapchainExtent.width),
+                                              static_cast<float>(swapchainExtent.height),
+                                              0.0f, 1.0f));
     commandBuffer.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), swapchainExtent));
+    commandBuffer.bindVertexBuffers(0, *vertexBuffer, {0});
+
     commandBuffer.draw(3, 1, 0, 0);
 
     // End rendering
