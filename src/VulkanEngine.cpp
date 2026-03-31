@@ -26,7 +26,7 @@ VulkanEngine::VulkanEngine(const int window_width, const int window_height, cons
     create_image_views();
     create_graphics_pipeline();
     create_command_pool();
-    create_vertex_buffers();
+    create_vertex_buffer();
     create_command_buffers();
     create_synchronization_objects();
 }
@@ -273,29 +273,57 @@ void VulkanEngine::create_command_pool() {
     commandPool = vk::raii::CommandPool(device, poolInfo);
 }
 
-void VulkanEngine::create_vertex_buffers() {
+void VulkanEngine::create_vertex_buffer() {
+    const vk::DeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+
+    const vk::BufferCreateInfo stagingInfo{
+        .size = bufferSize, .usage = vk::BufferUsageFlagBits::eTransferSrc, .sharingMode = vk::SharingMode::eExclusive
+    };
+    const vk::raii::Buffer stagingBuffer(device, stagingInfo);
+    const vk::MemoryRequirements memRequirementsStaging = stagingBuffer.getMemoryRequirements();
+    const vk::MemoryAllocateInfo memoryAllocateInfoStaging{
+        .allocationSize = memRequirementsStaging.size,
+        .memoryTypeIndex = find_memory_type(memRequirementsStaging.memoryTypeBits,
+                                            vk::MemoryPropertyFlagBits::eHostVisible |
+                                            vk::MemoryPropertyFlagBits::eHostCoherent)
+    };
+    const vk::raii::DeviceMemory stagingBufferMemory(device, memoryAllocateInfoStaging);
+
+    stagingBuffer.bindMemory(stagingBufferMemory, 0);
+    void *dataStaging = stagingBufferMemory.mapMemory(0, stagingInfo.size);
+    memcpy(dataStaging, vertices.data(), stagingInfo.size);
+    stagingBufferMemory.unmapMemory();
+
     const vk::BufferCreateInfo bufferInfo{
-        .size = sizeof(vertices[0]) * vertices.size(), .usage = vk::BufferUsageFlagBits::eVertexBuffer,
+        .size = bufferSize, .usage = vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
         .sharingMode = vk::SharingMode::eExclusive
     };
     vertexBuffer = vk::raii::Buffer(device, bufferInfo);
 
     const vk::MemoryRequirements memRequirements = vertexBuffer.getMemoryRequirements();
-
     const vk::MemoryAllocateInfo memoryAllocateInfo{
         .allocationSize = memRequirements.size,
-        .memoryTypeIndex = find_memory_type(memRequirements.memoryTypeBits,
-                                            vk::MemoryPropertyFlagBits::eHostVisible |
-                                            vk::MemoryPropertyFlagBits::eHostCoherent)
+        .memoryTypeIndex = find_memory_type(memRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal)
     };
+    vertexBufferMemory = vk::raii::DeviceMemory(device, memoryAllocateInfo);
 
-    vertexBufferMemory = vk::raii::DeviceMemory( device, memoryAllocateInfo );
+    vertexBuffer.bindMemory(*vertexBufferMemory, 0);
 
-    vertexBuffer.bindMemory( *vertexBufferMemory, 0 );
+    copyBuffer(stagingBuffer, vertexBuffer, stagingInfo.size);
+}
 
-    void* data = vertexBufferMemory.mapMemory(0, bufferInfo.size);
-    memcpy(data, vertices.data(), bufferInfo.size);
-    vertexBufferMemory.unmapMemory();
+void VulkanEngine::create_buffer(const vk::DeviceSize size, const vk::BufferUsageFlags usage,
+                                 const vk::MemoryPropertyFlags properties,
+                                 vk::raii::Buffer &buffer, vk::raii::DeviceMemory &bufferMemory) const {
+    const vk::BufferCreateInfo bufferInfo{.size = size, .usage = usage, .sharingMode = vk::SharingMode::eExclusive};
+    buffer = vk::raii::Buffer(device, bufferInfo);
+    const vk::MemoryRequirements memRequirements = buffer.getMemoryRequirements();
+    const vk::MemoryAllocateInfo allocInfo{
+        .allocationSize = memRequirements.size,
+        .memoryTypeIndex = find_memory_type(memRequirements.memoryTypeBits, properties)
+    };
+    bufferMemory = vk::raii::DeviceMemory(device, allocInfo);
+    buffer.bindMemory(*bufferMemory, 0);
 }
 
 uint32_t VulkanEngine::find_memory_type(const uint32_t typeFilter, const vk::MemoryPropertyFlags properties) const {
@@ -308,6 +336,20 @@ uint32_t VulkanEngine::find_memory_type(const uint32_t typeFilter, const vk::Mem
     }
 
     throw std::runtime_error("failed to find suitable memory type!");
+}
+
+void VulkanEngine::copyBuffer(const vk::raii::Buffer &srcBuffer, const vk::raii::Buffer &dstBuffer,
+                              const vk::DeviceSize size) const {
+    const vk::CommandBufferAllocateInfo allocInfo{
+        .commandPool = commandPool, .level = vk::CommandBufferLevel::ePrimary, .commandBufferCount = 1
+    };
+    const vk::raii::CommandBuffer commandCopyBuffer = std::move(device.allocateCommandBuffers(allocInfo).front());
+
+    commandCopyBuffer.begin(vk::CommandBufferBeginInfo{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+    commandCopyBuffer.copyBuffer(srcBuffer, dstBuffer, vk::BufferCopy(0, 0, size));
+    commandCopyBuffer.end();
+    queue.submit(vk::SubmitInfo{.commandBufferCount = 1, .pCommandBuffers = &*commandCopyBuffer}, nullptr);
+    queue.waitIdle();
 }
 
 void VulkanEngine::create_command_buffers() {

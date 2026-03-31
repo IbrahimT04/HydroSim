@@ -32,13 +32,11 @@ public:
         auto [result, imageIndex] = swapchain.acquireNextImage(
             UINT64_MAX, *presentCompleteSemaphores[frameIndex], nullptr);
 
-        if (result == vk::Result::eErrorOutOfDateKHR)
-        {
+        if (result == vk::Result::eErrorOutOfDateKHR) {
             recreate_swapchain();
             return;
         }
-        if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR)
-        {
+        if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
             assert(result == vk::Result::eTimeout || result == vk::Result::eNotReady);
             throw std::runtime_error("failed to acquire swap chain image!");
         }
@@ -65,17 +63,16 @@ public:
             .pWaitSemaphores = &*renderFinishedSemaphores[imageIndex],
             .swapchainCount = 1,
             .pSwapchains = &*swapchain,
-            .pImageIndices = &imageIndex};
+            .pImageIndices = &imageIndex
+        };
 
         result = queue.presentKHR(presentInfoKHR);
 
-        if ((result == vk::Result::eSuboptimalKHR) || (result == vk::Result::eErrorOutOfDateKHR) || framebufferResized)
-        {
+        if ((result == vk::Result::eSuboptimalKHR) || (result == vk::Result::eErrorOutOfDateKHR) ||
+            framebufferResized) {
             framebufferResized = false;
             recreate_swapchain();
-        }
-        else
-        {
+        } else {
             // There are no other success codes than eSuccess; on any error code, presentKHR already threw an exception.
             assert(result == vk::Result::eSuccess);
         }
@@ -135,8 +132,8 @@ private:
     std::vector<vk::raii::Fence> inFlightFences;
 
     // Vertex Objects
-    vk::raii::Buffer vertexBuffer {VK_NULL_HANDLE};
-    vk::raii::DeviceMemory vertexBufferMemory {VK_NULL_HANDLE};
+    vk::raii::Buffer vertexBuffer{VK_NULL_HANDLE};
+    vk::raii::DeviceMemory vertexBufferMemory{VK_NULL_HANDLE};
     const std::vector<vkBuffer::Vertex> vertices = {
         {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
         {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
@@ -172,9 +169,14 @@ private:
 
     void create_command_pool();
 
-    void create_vertex_buffers();
+    void create_vertex_buffer();
+
+    void create_buffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties,
+                       vk::raii::Buffer &buffer, vk::raii::DeviceMemory &bufferMemory) const;
 
     uint32_t find_memory_type(uint32_t typeFilter, vk::MemoryPropertyFlags properties) const;
+
+    void copyBuffer(const vk::raii::Buffer &srcBuffer, const vk::raii::Buffer &dstBuffer, vk::DeviceSize size) const;
 
     void create_command_buffers();
 
@@ -192,6 +194,7 @@ private:
     void record_command_buffer(uint32_t imageIndex) const;
 
     void cleanup_swapchain();
+
     void recreate_swapchain();
 };
 
