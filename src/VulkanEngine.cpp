@@ -27,6 +27,7 @@ VulkanEngine::VulkanEngine(const int window_width, const int window_height, cons
     create_graphics_pipeline();
     create_command_pool();
     create_vertex_buffer();
+    if constexpr (indexing) create_index_buffer();
     create_command_buffers();
     create_synchronization_objects();
 }
@@ -312,6 +313,25 @@ void VulkanEngine::create_vertex_buffer() {
     copyBuffer(stagingBuffer, vertexBuffer, stagingInfo.size);
 }
 
+void VulkanEngine::create_index_buffer() {
+    vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+
+    vk::raii::Buffer stagingBuffer({});
+    vk::raii::DeviceMemory stagingBufferMemory({});
+    create_buffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc,
+                  vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingBuffer,
+                  stagingBufferMemory);
+
+    void *data = stagingBufferMemory.mapMemory(0, bufferSize);
+    memcpy(data, indices.data(), (size_t) bufferSize);
+    stagingBufferMemory.unmapMemory();
+
+    create_buffer(bufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer,
+                  vk::MemoryPropertyFlagBits::eDeviceLocal, indexBuffer, indexBufferMemory);
+
+    copyBuffer(stagingBuffer, indexBuffer, bufferSize);
+}
+
 void VulkanEngine::create_buffer(const vk::DeviceSize size, const vk::BufferUsageFlags usage,
                                  const vk::MemoryPropertyFlags properties,
                                  vk::raii::Buffer &buffer, vk::raii::DeviceMemory &bufferMemory) const {
@@ -454,8 +474,10 @@ void VulkanEngine::record_command_buffer(const uint32_t imageIndex) const {
     commandBuffer.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), swapchainExtent));
     commandBuffer.bindVertexBuffers(0, *vertexBuffer, {0});
 
-    commandBuffer.draw(3, 1, 0, 0);
+    if constexpr (indexing) commandBuffer.bindIndexBuffer(*indexBuffer, 0, vk::IndexType::eUint16);
 
+    if constexpr (indexing) commandBuffer.drawIndexed(indices.size(), 1, 0, 0, 0);
+    else commandBuffer.draw(3, 1, 0, 0);
     // End rendering
     commandBuffer.endRendering();
 

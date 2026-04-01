@@ -85,6 +85,7 @@ private:
 #else
     static constexpr bool debug = true;
 #endif
+    static constexpr bool indexing = true;
 
     std::string name = "VulkanEngine";
 
@@ -134,10 +135,18 @@ private:
     // Vertex Objects
     vk::raii::Buffer vertexBuffer{VK_NULL_HANDLE};
     vk::raii::DeviceMemory vertexBufferMemory{VK_NULL_HANDLE};
+    vk::raii::Buffer indexBuffer{VK_NULL_HANDLE};
+    vk::raii::DeviceMemory indexBufferMemory{VK_NULL_HANDLE};
+
+    // Data Objects
     const std::vector<vkBuffer::Vertex> vertices = {
-        {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-        {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-        {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+        {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+        {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+        {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
+    };
+    const std::vector<uint16_t> indices = {
+        0, 1, 2, 2, 3, 0
     };
 
     // Frame Objects
@@ -171,10 +180,12 @@ private:
 
     void create_vertex_buffer();
 
+    void create_index_buffer();
+
     void create_buffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties,
                        vk::raii::Buffer &buffer, vk::raii::DeviceMemory &bufferMemory) const;
 
-    uint32_t find_memory_type(uint32_t typeFilter, vk::MemoryPropertyFlags properties) const;
+    [[nodiscard]] uint32_t find_memory_type(uint32_t typeFilter, vk::MemoryPropertyFlags properties) const;
 
     void copyBuffer(const vk::raii::Buffer &srcBuffer, const vk::raii::Buffer &dstBuffer, vk::DeviceSize size) const;
 
