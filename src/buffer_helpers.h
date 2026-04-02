@@ -23,6 +23,11 @@ namespace vkBuffer {
             };
         }
     };
+    struct UniformBufferObject {
+        glm::mat4 model;
+        glm::mat4 view;
+        glm::mat4 proj;
+    };
 }
 
 #endif //HYDROSIM_BUFFER_HELPERS_H

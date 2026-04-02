@@ -24,10 +24,12 @@ VulkanEngine::VulkanEngine(const int window_width, const int window_height, cons
     queue = vk::raii::Queue(device, vkDevice::get_queue_index(physicalDevice, surface), 0);
     create_swapchain();
     create_image_views();
+    create_descriptor_set_layout();
     create_graphics_pipeline();
     create_command_pool();
     create_vertex_buffer();
     if constexpr (indexing) create_index_buffer();
+    create_uniform_buffers();
     create_command_buffers();
     create_synchronization_objects();
 }
@@ -152,6 +154,13 @@ vk::raii::ShaderModule VulkanEngine::create_shader_module(const std::vector<char
     return shaderModule;
 }
 
+void VulkanEngine::create_descriptor_set_layout() {
+    vk::DescriptorSetLayoutBinding uboLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1,
+                                                    vk::ShaderStageFlagBits::eVertex, VK_NULL_HANDLE);
+    const vk::DescriptorSetLayoutCreateInfo layoutInfo{.bindingCount = 1, .pBindings = &uboLayoutBinding};
+    descriptorSetLayout = vk::raii::DescriptorSetLayout(device, layoutInfo);
+}
+
 void VulkanEngine::create_graphics_pipeline() {
     const vk::raii::ShaderModule shaderModule =
             create_shader_module(vkSlang::readFile("spir_v_shaders/default.spv"));
@@ -231,8 +240,9 @@ void VulkanEngine::create_graphics_pipeline() {
         .pAttachments = &colorBlendAttachment
     };
 
-    constexpr vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
+    const vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
         .setLayoutCount = 0,
+        .pSetLayouts = &*descriptorSetLayout,
         .pushConstantRangeCount = 0
     };
 
@@ -314,7 +324,7 @@ void VulkanEngine::create_vertex_buffer() {
 }
 
 void VulkanEngine::create_index_buffer() {
-    vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+    const vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();
 
     vk::raii::Buffer stagingBuffer({});
     vk::raii::DeviceMemory stagingBufferMemory({});
@@ -330,6 +340,24 @@ void VulkanEngine::create_index_buffer() {
                   vk::MemoryPropertyFlagBits::eDeviceLocal, indexBuffer, indexBufferMemory);
 
     copyBuffer(stagingBuffer, indexBuffer, bufferSize);
+}
+
+void VulkanEngine::create_uniform_buffers() {
+    uniformBuffers.clear();
+    uniformBuffersMemory.clear();
+    uniformBuffersMapped.clear();
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        constexpr vk::DeviceSize bufferSize = sizeof(vkBuffer::UniformBufferObject);
+        vk::raii::Buffer buffer({});
+        vk::raii::DeviceMemory bufferMem({});
+        create_buffer(bufferSize, vk::BufferUsageFlagBits::eUniformBuffer,
+                      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+                      buffer, bufferMem);
+        uniformBuffers.emplace_back(std::move(buffer));
+        uniformBuffersMemory.emplace_back(std::move(bufferMem));
+        uniformBuffersMapped.emplace_back(uniformBuffersMemory[i].mapMemory(0, bufferSize));
+    }
 }
 
 void VulkanEngine::create_buffer(const vk::DeviceSize size, const vk::BufferUsageFlags usage,
@@ -511,6 +539,23 @@ void VulkanEngine::recreate_swapchain() {
     cleanup_swapchain();
     create_swapchain();
     create_image_views();
+}
+
+void VulkanEngine::update_uniform_buffer(uint32_t currentImage) {
+    static auto startTime = std::chrono::high_resolution_clock::now();
+
+    const auto currentTime = std::chrono::high_resolution_clock::now();
+    const float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+    vkBuffer::UniformBufferObject ubo{};
+    ubo.model = rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.view = lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.proj = glm::perspective(glm::radians(45.0f),
+                                static_cast<float>(swapchainExtent.width) / static_cast<float>(swapchainExtent.height),
+                                0.1f, 10.0f);
+    ubo.proj[1][1] *= -1;
+
+    memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
 }
 
 VulkanEngine::~VulkanEngine() {

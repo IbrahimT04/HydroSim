@@ -10,6 +10,7 @@
 
 class VulkanEngine {
 public:
+
     explicit VulkanEngine(int window_width = 640, int window_height = 480,
                           const std::string &engine_name = "Vulkan Engine");
 
@@ -24,6 +25,9 @@ public:
     }
 
     void drawFrame() {
+
+        update_uniform_buffer(frameIndex);
+
         if (const auto fenceResult = device.waitForFences(*inFlightFences[frameIndex], vk::True, UINT64_MAX);
             fenceResult != vk::Result::eSuccess) {
             throw std::runtime_error("failed to wait for fence!");
@@ -138,6 +142,14 @@ private:
     vk::raii::Buffer indexBuffer{VK_NULL_HANDLE};
     vk::raii::DeviceMemory indexBufferMemory{VK_NULL_HANDLE};
 
+    // Descriptor Objects
+    vk::raii::DescriptorSetLayout descriptorSetLayout{VK_NULL_HANDLE};
+
+    // Uniform Buffers
+    std::vector<vk::raii::Buffer> uniformBuffers;
+    std::vector<vk::raii::DeviceMemory> uniformBuffersMemory;
+    std::vector<void*> uniformBuffersMapped;
+
     // Data Objects
     const std::vector<vkBuffer::Vertex> vertices = {
         {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
@@ -174,6 +186,8 @@ private:
 
     [[nodiscard]] vk::raii::ShaderModule create_shader_module(const std::vector<char> &code) const;
 
+    void create_descriptor_set_layout();
+
     void create_graphics_pipeline();
 
     void create_command_pool();
@@ -181,6 +195,8 @@ private:
     void create_vertex_buffer();
 
     void create_index_buffer();
+
+    void create_uniform_buffers();
 
     void create_buffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties,
                        vk::raii::Buffer &buffer, vk::raii::DeviceMemory &bufferMemory) const;
@@ -207,6 +223,8 @@ private:
     void cleanup_swapchain();
 
     void recreate_swapchain();
+
+    void update_uniform_buffer(uint32_t currentImage);
 };
 
 #endif //HYDROSIM_VULKANENGINE_H
