@@ -30,6 +30,8 @@ VulkanEngine::VulkanEngine(const int window_width, const int window_height, cons
     create_vertex_buffer();
     if constexpr (indexing) create_index_buffer();
     create_uniform_buffers();
+    create_descriptor_pool();
+    create_descriptor_sets();
     create_command_buffers();
     create_synchronization_objects();
 }
@@ -214,7 +216,7 @@ void VulkanEngine::create_graphics_pipeline() {
         .rasterizerDiscardEnable = VK_FALSE,
         .polygonMode = vk::PolygonMode::eFill,
         .cullMode = vk::CullModeFlagBits::eBack,
-        .frontFace = vk::FrontFace::eClockwise,
+        .frontFace = vk::FrontFace::eCounterClockwise,
         .depthBiasEnable = VK_FALSE,
         .lineWidth = 1.0f
     };
@@ -241,7 +243,7 @@ void VulkanEngine::create_graphics_pipeline() {
     };
 
     const vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
-        .setLayoutCount = 0,
+        .setLayoutCount = 1,
         .pSetLayouts = &*descriptorSetLayout,
         .pushConstantRangeCount = 0
     };
@@ -357,6 +359,36 @@ void VulkanEngine::create_uniform_buffers() {
         uniformBuffers.emplace_back(std::move(buffer));
         uniformBuffersMemory.emplace_back(std::move(bufferMem));
         uniformBuffersMapped.emplace_back(uniformBuffersMemory[i].mapMemory(0, bufferSize));
+    }
+}
+
+void VulkanEngine::create_descriptor_pool() {
+    vk::DescriptorPoolSize poolSize(vk::DescriptorType::eUniformBuffer, MAX_FRAMES_IN_FLIGHT);
+    const vk::DescriptorPoolCreateInfo poolInfo{
+        .flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, .maxSets = MAX_FRAMES_IN_FLIGHT,
+        .poolSizeCount = 1, .pPoolSizes = &poolSize
+    };
+    descriptorPool = vk::raii::DescriptorPool(device, poolInfo);
+}
+
+void VulkanEngine::create_descriptor_sets() {
+    std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, *descriptorSetLayout);
+    const vk::DescriptorSetAllocateInfo allocInfo{
+        .descriptorPool = descriptorPool, .descriptorSetCount = static_cast<uint32_t>(layouts.size()),
+        .pSetLayouts = layouts.data()
+    };
+    descriptorSets.clear();
+    descriptorSets = device.allocateDescriptorSets(allocInfo);
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        vk::DescriptorBufferInfo bufferInfo{
+            .buffer = uniformBuffers[i], .offset = 0, .range = sizeof(vkBuffer::UniformBufferObject)
+        };
+        vk::WriteDescriptorSet descriptorWrite{
+            .dstSet = descriptorSets[i], .dstBinding = 0, .dstArrayElement = 0, .descriptorCount = 1,
+            .descriptorType = vk::DescriptorType::eUniformBuffer, .pBufferInfo = &bufferInfo
+        };
+        device.updateDescriptorSets(descriptorWrite, {});
     }
 }
 
@@ -504,6 +536,9 @@ void VulkanEngine::record_command_buffer(const uint32_t imageIndex) const {
 
     if constexpr (indexing) commandBuffer.bindIndexBuffer(*indexBuffer, 0, vk::IndexType::eUint16);
 
+    commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0,
+                                     *descriptorSets[frameIndex], nullptr);
+
     if constexpr (indexing) commandBuffer.drawIndexed(indices.size(), 1, 0, 0, 0);
     else commandBuffer.draw(3, 1, 0, 0);
     // End rendering
@@ -541,7 +576,7 @@ void VulkanEngine::recreate_swapchain() {
     create_image_views();
 }
 
-void VulkanEngine::update_uniform_buffer(uint32_t currentImage) {
+void VulkanEngine::update_uniform_buffer(uint32_t currentImage) const {
     static auto startTime = std::chrono::high_resolution_clock::now();
 
     const auto currentTime = std::chrono::high_resolution_clock::now();

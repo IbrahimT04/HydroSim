@@ -144,6 +144,8 @@ private:
 
     // Descriptor Objects
     vk::raii::DescriptorSetLayout descriptorSetLayout{VK_NULL_HANDLE};
+    vk::raii::DescriptorPool descriptorPool{VK_NULL_HANDLE};
+    std::vector<vk::raii::DescriptorSet> descriptorSets;
 
     // Uniform Buffers
     std::vector<vk::raii::Buffer> uniformBuffers;
@@ -198,6 +200,10 @@ private:
 
     void create_uniform_buffers();
 
+    void create_descriptor_pool();
+
+    void create_descriptor_sets();
+
     void create_buffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties,
                        vk::raii::Buffer &buffer, vk::raii::DeviceMemory &bufferMemory) const;
 
@@ -224,7 +230,7 @@ private:
 
     void recreate_swapchain();
 
-    void update_uniform_buffer(uint32_t currentImage);
+    void update_uniform_buffer(uint32_t currentImage) const;
 };
 
 #endif //HYDROSIM_VULKANENGINE_H
