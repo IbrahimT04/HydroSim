@@ -6,11 +6,11 @@
 #define HYDROSIM_VULKANENGINE_H
 
 #include "config.h"
+#define STB_IMAGE_IMPLEMENTATION
 #include "buffer_helpers.h"
 
 class VulkanEngine {
 public:
-
     explicit VulkanEngine(int window_width = 640, int window_height = 480,
                           const std::string &engine_name = "Vulkan Engine");
 
@@ -25,7 +25,6 @@ public:
     }
 
     void drawFrame() {
-
         update_uniform_buffer(frameIndex);
 
         if (const auto fenceResult = device.waitForFences(*inFlightFences[frameIndex], vk::True, UINT64_MAX);
@@ -150,18 +149,23 @@ private:
     // Uniform Buffers
     std::vector<vk::raii::Buffer> uniformBuffers;
     std::vector<vk::raii::DeviceMemory> uniformBuffersMemory;
-    std::vector<void*> uniformBuffersMapped;
+    std::vector<void *> uniformBuffersMapped;
 
     // Data Objects
     const std::vector<vkBuffer::Vertex> vertices = {
-        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-        {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-        {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
-        {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
+        {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
+        {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},
+        {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}},
+        {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}}
     };
     const std::vector<uint16_t> indices = {
         0, 1, 2, 2, 3, 0
     };
+
+    // Texture Objects
+    vk::raii::Image textureImage{VK_NULL_HANDLE};
+    vk::raii::DeviceMemory textureImageMemory{VK_NULL_HANDLE};
+    vk::raii::ImageView textureImageView{VK_NULL_HANDLE};
 
     // Frame Objects
     static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
@@ -194,6 +198,13 @@ private:
 
     void create_command_pool();
 
+    void create_texture_image();
+
+    void create_image(uint32_t image_width, uint32_t image_height, vk::Format format, vk::ImageTiling tiling,
+                      vk::ImageUsageFlags usage,
+                      vk::MemoryPropertyFlags properties, vk::raii::Image &image,
+                      vk::raii::DeviceMemory &imageMemory) const;
+
     void create_vertex_buffer();
 
     void create_index_buffer();
@@ -209,11 +220,14 @@ private:
 
     [[nodiscard]] uint32_t find_memory_type(uint32_t typeFilter, vk::MemoryPropertyFlags properties) const;
 
-    void copyBuffer(const vk::raii::Buffer &srcBuffer, const vk::raii::Buffer &dstBuffer, vk::DeviceSize size) const;
+    void copy_buffer(const vk::raii::Buffer &srcBuffer, const vk::raii::Buffer &dstBuffer, vk::DeviceSize size) const;
 
     void create_command_buffers();
 
     void create_synchronization_objects();
+
+    void transitionImageLayout(const vk::raii::Image &image, vk::ImageLayout oldLayout,
+                               vk::ImageLayout newLayout) const;
 
     void transition_image_layout(
         uint32_t imageIndex,
@@ -231,6 +245,13 @@ private:
     void recreate_swapchain();
 
     void update_uniform_buffer(uint32_t currentImage) const;
+
+    vk::raii::CommandBuffer begin_single_time_commands() const;
+
+    void end_single_time_commands(const vk::raii::CommandBuffer &commandBuffer) const;
+
+    void copy_buffer_to_image(const vk::raii::Buffer &buffer, const vk::raii::Image &image, uint32_t image_width,
+                           uint32_t image_height) const;
 };
 
 #endif //HYDROSIM_VULKANENGINE_H

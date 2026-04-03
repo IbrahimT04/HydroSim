@@ -3,6 +3,8 @@
 //
 #include "VulkanEngine.h"
 
+#include "external/stb/stb_image.h"
+
 #include "instance_helpers.h"
 #include "logging.h"
 #include "device_helpers.h"
@@ -27,6 +29,7 @@ VulkanEngine::VulkanEngine(const int window_width, const int window_height, cons
     create_descriptor_set_layout();
     create_graphics_pipeline();
     create_command_pool();
+    create_texture_image();
     create_vertex_buffer();
     if constexpr (indexing) create_index_buffer();
     create_uniform_buffers();
@@ -286,6 +289,75 @@ void VulkanEngine::create_command_pool() {
     commandPool = vk::raii::CommandPool(device, poolInfo);
 }
 
+void VulkanEngine::create_texture_image() {
+    int texWidth, texHeight, texChannels;
+    stbi_uc *pixels = stbi_load("textures/statue.jpg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+
+    if (!pixels) {
+        throw std::runtime_error("failed to load texture image!");
+    }
+
+    const vk::DeviceSize imageSize = static_cast<vk::DeviceSize>(texWidth) * texHeight * 4;
+
+    vk::raii::Buffer stagingBuffer{nullptr};
+    vk::raii::DeviceMemory stagingBufferMemory{nullptr};
+    create_buffer(
+        imageSize,
+        vk::BufferUsageFlagBits::eTransferSrc,
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+        stagingBuffer,
+        stagingBufferMemory
+    );
+
+    void *data = stagingBufferMemory.mapMemory(0, imageSize);
+    memcpy(data, pixels, static_cast<size_t>(imageSize));
+    stagingBufferMemory.unmapMemory();
+
+    stbi_image_free(pixels);
+
+    // Create the MEMBER image, not a temporary local image.
+    create_image(
+        static_cast<uint32_t>(texWidth),
+        static_cast<uint32_t>(texHeight),
+        vk::Format::eR8G8B8A8Srgb,
+        vk::ImageTiling::eOptimal,
+        vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+        vk::MemoryPropertyFlagBits::eDeviceLocal,
+        textureImage,
+        textureImageMemory
+    );
+
+    transitionImageLayout(textureImage, vk::ImageLayout::eUndefined,
+                          vk::ImageLayout::eTransferDstOptimal);
+    copy_buffer_to_image(stagingBuffer, textureImage, static_cast<uint32_t>(texWidth),
+                         static_cast<uint32_t>(texHeight));
+    transitionImageLayout(textureImage, vk::ImageLayout::eTransferDstOptimal,
+                          vk::ImageLayout::eShaderReadOnlyOptimal);
+}
+
+void VulkanEngine::create_image(const uint32_t image_width, const uint32_t image_height, const vk::Format format,
+                                const vk::ImageTiling tiling,
+                                const vk::ImageUsageFlags usage, const vk::MemoryPropertyFlags properties,
+                                vk::raii::Image &image,
+                                vk::raii::DeviceMemory &imageMemory) const {
+    const vk::ImageCreateInfo imageInfo{
+        .imageType = vk::ImageType::e2D, .format = format,
+        .extent = {image_width, image_height, 1}, .mipLevels = 1, .arrayLayers = 1,
+        .samples = vk::SampleCountFlagBits::e1, .tiling = tiling,
+        .usage = usage, .sharingMode = vk::SharingMode::eExclusive
+    };
+
+    image = vk::raii::Image(device, imageInfo);
+
+    vk::MemoryRequirements memRequirements = image.getMemoryRequirements();
+    vk::MemoryAllocateInfo allocInfo{
+        .allocationSize = memRequirements.size,
+        .memoryTypeIndex = find_memory_type(memRequirements.memoryTypeBits, properties)
+    };
+    imageMemory = vk::raii::DeviceMemory(device, allocInfo);
+    image.bindMemory(imageMemory, 0);
+}
+
 void VulkanEngine::create_vertex_buffer() {
     const vk::DeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
 
@@ -322,7 +394,7 @@ void VulkanEngine::create_vertex_buffer() {
 
     vertexBuffer.bindMemory(*vertexBufferMemory, 0);
 
-    copyBuffer(stagingBuffer, vertexBuffer, stagingInfo.size);
+    copy_buffer(stagingBuffer, vertexBuffer, stagingInfo.size);
 }
 
 void VulkanEngine::create_index_buffer() {
@@ -341,7 +413,7 @@ void VulkanEngine::create_index_buffer() {
     create_buffer(bufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer,
                   vk::MemoryPropertyFlagBits::eDeviceLocal, indexBuffer, indexBufferMemory);
 
-    copyBuffer(stagingBuffer, indexBuffer, bufferSize);
+    copy_buffer(stagingBuffer, indexBuffer, bufferSize);
 }
 
 void VulkanEngine::create_uniform_buffers() {
@@ -418,18 +490,11 @@ uint32_t VulkanEngine::find_memory_type(const uint32_t typeFilter, const vk::Mem
     throw std::runtime_error("failed to find suitable memory type!");
 }
 
-void VulkanEngine::copyBuffer(const vk::raii::Buffer &srcBuffer, const vk::raii::Buffer &dstBuffer,
-                              const vk::DeviceSize size) const {
-    const vk::CommandBufferAllocateInfo allocInfo{
-        .commandPool = commandPool, .level = vk::CommandBufferLevel::ePrimary, .commandBufferCount = 1
-    };
-    const vk::raii::CommandBuffer commandCopyBuffer = std::move(device.allocateCommandBuffers(allocInfo).front());
-
-    commandCopyBuffer.begin(vk::CommandBufferBeginInfo{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+void VulkanEngine::copy_buffer(const vk::raii::Buffer &srcBuffer, const vk::raii::Buffer &dstBuffer,
+                               const vk::DeviceSize size) const {
+    const vk::raii::CommandBuffer commandCopyBuffer = begin_single_time_commands();
     commandCopyBuffer.copyBuffer(srcBuffer, dstBuffer, vk::BufferCopy(0, 0, size));
-    commandCopyBuffer.end();
-    queue.submit(vk::SubmitInfo{.commandBufferCount = 1, .pCommandBuffers = &*commandCopyBuffer}, nullptr);
-    queue.waitIdle();
+    end_single_time_commands(commandCopyBuffer);
 }
 
 void VulkanEngine::create_command_buffers() {
@@ -452,6 +517,38 @@ void VulkanEngine::create_synchronization_objects() {
         presentCompleteSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
         inFlightFences.emplace_back(device, vk::FenceCreateInfo{.flags = vk::FenceCreateFlagBits::eSignaled});
     }
+}
+
+void VulkanEngine::transitionImageLayout(const vk::raii::Image &image, vk::ImageLayout oldLayout,
+                                         const vk::ImageLayout newLayout) const {
+    const auto commandBuffer = begin_single_time_commands();
+
+    vk::ImageMemoryBarrier barrier{
+        .oldLayout = oldLayout, .newLayout = newLayout, .image = image,
+        .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}
+    };
+
+    vk::PipelineStageFlags sourceStage;
+    vk::PipelineStageFlags destinationStage;
+
+    if (oldLayout == vk::ImageLayout::eUndefined && newLayout == vk::ImageLayout::eTransferDstOptimal) {
+        barrier.srcAccessMask = {};
+        barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
+
+        sourceStage = vk::PipelineStageFlagBits::eTopOfPipe;
+        destinationStage = vk::PipelineStageFlagBits::eTransfer;
+    } else if (oldLayout == vk::ImageLayout::eTransferDstOptimal && newLayout ==
+               vk::ImageLayout::eShaderReadOnlyOptimal) {
+        barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+        barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
+
+        sourceStage = vk::PipelineStageFlagBits::eTransfer;
+        destinationStage = vk::PipelineStageFlagBits::eFragmentShader;
+    } else {
+        throw std::invalid_argument("unsupported layout transition!");
+    }
+    commandBuffer.pipelineBarrier(sourceStage, destinationStage, {}, {}, nullptr, barrier);
+    end_single_time_commands(commandBuffer);
 }
 
 void VulkanEngine::transition_image_layout(
@@ -576,7 +673,7 @@ void VulkanEngine::recreate_swapchain() {
     create_image_views();
 }
 
-void VulkanEngine::update_uniform_buffer(uint32_t currentImage) const {
+void VulkanEngine::update_uniform_buffer(const uint32_t currentImage) const {
     static auto startTime = std::chrono::high_resolution_clock::now();
 
     const auto currentTime = std::chrono::high_resolution_clock::now();
@@ -591,6 +688,41 @@ void VulkanEngine::update_uniform_buffer(uint32_t currentImage) const {
     ubo.proj[1][1] *= -1;
 
     memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+}
+
+vk::raii::CommandBuffer VulkanEngine::begin_single_time_commands() const {
+    const vk::CommandBufferAllocateInfo allocInfo{
+        .commandPool = commandPool, .level = vk::CommandBufferLevel::ePrimary, .commandBufferCount = 1
+    };
+    vk::raii::CommandBuffer commandBuffer = std::move(device.allocateCommandBuffers(allocInfo).front());
+
+    constexpr vk::CommandBufferBeginInfo beginInfo{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit};
+    commandBuffer.begin(beginInfo);
+
+    return commandBuffer;
+}
+
+void VulkanEngine::end_single_time_commands(const vk::raii::CommandBuffer &commandBuffer) const {
+    commandBuffer.end();
+
+    const vk::SubmitInfo submitInfo{.commandBufferCount = 1, .pCommandBuffers = &*commandBuffer};
+    queue.submit(submitInfo, nullptr);
+    queue.waitIdle();
+}
+
+void VulkanEngine::copy_buffer_to_image(const vk::raii::Buffer &buffer, const vk::raii::Image &image,
+                                        const uint32_t image_width, const uint32_t image_height) const {
+    const vk::raii::CommandBuffer commandBuffer = begin_single_time_commands();
+
+    vk::BufferImageCopy region{
+        .bufferOffset = 0, .bufferRowLength = 0, .bufferImageHeight = 0,
+        .imageSubresource = {vk::ImageAspectFlagBits::eColor, 0, 0, 1}, .imageOffset = {0, 0, 0},
+        .imageExtent = {image_width, image_height, 1}
+    };
+    commandBuffer.copyBufferToImage(buffer, image, vk::ImageLayout::eTransferDstOptimal, {region});
+
+    // Submit the buffer copy to the graphics queue
+    end_single_time_commands(commandBuffer);
 }
 
 VulkanEngine::~VulkanEngine() {

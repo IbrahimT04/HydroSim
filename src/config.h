@@ -14,13 +14,16 @@
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
 #include <vulkan/vulkan_raii.hpp>
 
+#include <chrono>
 #include <iostream>
 #include <string>
 #include <vector>
-#include <chrono>
 
+#define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+
+#include "external/stb/stb_image.h"
 
 
 #endif //HYDROSIM_IMPORT_CONFIG_H

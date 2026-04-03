@@ -4,7 +4,6 @@
 
 #include <iostream>
 
-#include "src/config.h"
 #include "src/VulkanEngine.h"
 
 int main() {
