@@ -43,7 +43,8 @@ namespace vkDevice {
                     vk::PhysicalDeviceVulkan13Features,
                     vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>();
 
-        bool supportsRequiredFeatures = features.get<vk::PhysicalDeviceVulkan11Features>().shaderDrawParameters &&
+        bool supportsRequiredFeatures = features.get<vk::PhysicalDeviceFeatures2>().features.samplerAnisotropy &&
+                                        features.get<vk::PhysicalDeviceVulkan11Features>().shaderDrawParameters &&
                                         features.get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering &&
                                         features.get<vk::PhysicalDeviceVulkan13Features>().synchronization2 &&
                                         features.get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>().
@@ -111,7 +112,7 @@ namespace vkDevice {
             vk::PhysicalDeviceVulkan11Features,
             vk::PhysicalDeviceVulkan13Features,
             vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> featureChain = {
-            {}, // vk::PhysicalDeviceFeatures2 (empty for now)
+            {.features = {.samplerAnisotropy = true } }, // vk::PhysicalDeviceFeatures2
             {.shaderDrawParameters = VK_TRUE},
             {.synchronization2 = VK_TRUE, .dynamicRendering = VK_TRUE}, // Enable dynamic rendering from Vulkan 1.3
             {.extendedDynamicState = VK_TRUE} // Enable extended dynamic state from the extension

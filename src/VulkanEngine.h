@@ -39,6 +39,7 @@ public:
             recreate_swapchain();
             return;
         }
+
         if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
             assert(result == vk::Result::eTimeout || result == vk::Result::eNotReady);
             throw std::runtime_error("failed to acquire swap chain image!");
@@ -166,6 +167,7 @@ private:
     vk::raii::Image textureImage{VK_NULL_HANDLE};
     vk::raii::DeviceMemory textureImageMemory{VK_NULL_HANDLE};
     vk::raii::ImageView textureImageView{VK_NULL_HANDLE};
+    vk::raii::Sampler textureSampler{VK_NULL_HANDLE};
 
     // Frame Objects
     static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
@@ -200,10 +202,16 @@ private:
 
     void create_texture_image();
 
+    void create_texture_image_views();
+
+    void create_texture_sampler();
+
     void create_image(uint32_t image_width, uint32_t image_height, vk::Format format, vk::ImageTiling tiling,
                       vk::ImageUsageFlags usage,
                       vk::MemoryPropertyFlags properties, vk::raii::Image &image,
                       vk::raii::DeviceMemory &imageMemory) const;
+
+    vk::raii::ImageView create_image_view(const vk::raii::Image &image, vk::Format format);
 
     void create_vertex_buffer();
 
@@ -226,10 +234,10 @@ private:
 
     void create_synchronization_objects();
 
-    void transitionImageLayout(const vk::raii::Image &image, vk::ImageLayout oldLayout,
+    void transition_image_layout(const vk::raii::Image &image, vk::ImageLayout oldLayout,
                                vk::ImageLayout newLayout) const;
 
-    void transition_image_layout(
+    void transition_pipeline_image_layout(
         uint32_t imageIndex,
         vk::ImageLayout oldLayout,
         vk::ImageLayout newLayout,

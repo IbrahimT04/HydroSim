@@ -30,6 +30,8 @@ VulkanEngine::VulkanEngine(const int window_width, const int window_height, cons
     create_graphics_pipeline();
     create_command_pool();
     create_texture_image();
+    create_texture_image_views();
+    create_texture_sampler();
     create_vertex_buffer();
     if constexpr (indexing) create_index_buffer();
     create_uniform_buffers();
@@ -327,12 +329,34 @@ void VulkanEngine::create_texture_image() {
         textureImageMemory
     );
 
-    transitionImageLayout(textureImage, vk::ImageLayout::eUndefined,
-                          vk::ImageLayout::eTransferDstOptimal);
+    transition_image_layout(textureImage, vk::ImageLayout::eUndefined,
+                            vk::ImageLayout::eTransferDstOptimal);
     copy_buffer_to_image(stagingBuffer, textureImage, static_cast<uint32_t>(texWidth),
                          static_cast<uint32_t>(texHeight));
-    transitionImageLayout(textureImage, vk::ImageLayout::eTransferDstOptimal,
-                          vk::ImageLayout::eShaderReadOnlyOptimal);
+    transition_image_layout(textureImage, vk::ImageLayout::eTransferDstOptimal,
+                            vk::ImageLayout::eShaderReadOnlyOptimal);
+}
+
+void VulkanEngine::create_texture_image_views() {
+    textureImageView = create_image_view(textureImage, vk::Format::eR8G8B8A8Srgb);
+}
+
+void VulkanEngine::create_texture_sampler() {
+    const vk::PhysicalDeviceProperties properties = physicalDevice.getProperties();
+    const vk::SamplerCreateInfo samplerInfo {
+        .magFilter = vk::Filter::eLinear, .minFilter = vk::Filter::eLinear,
+        .mipmapMode = vk::SamplerMipmapMode::eLinear,
+        .addressModeU = vk::SamplerAddressMode::eRepeat, .addressModeV = vk::SamplerAddressMode::eRepeat,
+        .addressModeW = vk::SamplerAddressMode::eRepeat,
+        .mipLodBias = 0.0f,
+        .anisotropyEnable = vk::True, .maxAnisotropy = properties.limits.maxSamplerAnisotropy,
+        .compareEnable = vk::False, .compareOp = vk::CompareOp::eAlways,
+        .minLod = 0.0f, .maxLod = 0.0f,
+        .borderColor = vk::BorderColor::eIntOpaqueBlack, // Can change based on preference
+        .unnormalizedCoordinates = vk::False
+    };
+
+    textureSampler = vk::raii::Sampler(device, samplerInfo);
 }
 
 void VulkanEngine::create_image(const uint32_t image_width, const uint32_t image_height, const vk::Format format,
@@ -349,13 +373,21 @@ void VulkanEngine::create_image(const uint32_t image_width, const uint32_t image
 
     image = vk::raii::Image(device, imageInfo);
 
-    vk::MemoryRequirements memRequirements = image.getMemoryRequirements();
-    vk::MemoryAllocateInfo allocInfo{
+    const vk::MemoryRequirements memRequirements = image.getMemoryRequirements();
+    const vk::MemoryAllocateInfo allocInfo{
         .allocationSize = memRequirements.size,
         .memoryTypeIndex = find_memory_type(memRequirements.memoryTypeBits, properties)
     };
     imageMemory = vk::raii::DeviceMemory(device, allocInfo);
     image.bindMemory(imageMemory, 0);
+}
+
+vk::raii::ImageView VulkanEngine::create_image_view(const vk::raii::Image &image, const vk::Format format) {
+    vk::ImageViewCreateInfo viewInfo{
+        .image = image, .viewType = vk::ImageViewType::e2D,
+        .format = format, .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}
+    };
+    return {device, viewInfo};
 }
 
 void VulkanEngine::create_vertex_buffer() {
@@ -519,8 +551,8 @@ void VulkanEngine::create_synchronization_objects() {
     }
 }
 
-void VulkanEngine::transitionImageLayout(const vk::raii::Image &image, vk::ImageLayout oldLayout,
-                                         const vk::ImageLayout newLayout) const {
+void VulkanEngine::transition_image_layout(const vk::raii::Image &image, const vk::ImageLayout oldLayout,
+                                           const vk::ImageLayout newLayout) const {
     const auto commandBuffer = begin_single_time_commands();
 
     vk::ImageMemoryBarrier barrier{
@@ -551,7 +583,7 @@ void VulkanEngine::transitionImageLayout(const vk::raii::Image &image, vk::Image
     end_single_time_commands(commandBuffer);
 }
 
-void VulkanEngine::transition_image_layout(
+void VulkanEngine::transition_pipeline_image_layout(
     const uint32_t imageIndex,
     const vk::ImageLayout oldLayout,
     const vk::ImageLayout newLayout,
@@ -591,7 +623,7 @@ void VulkanEngine::record_command_buffer(const uint32_t imageIndex) const {
     commandBuffer.begin({});
 
     // Transition the image layout for rendering
-    transition_image_layout(
+    transition_pipeline_image_layout(
         imageIndex,
         vk::ImageLayout::eUndefined,
         vk::ImageLayout::eColorAttachmentOptimal,
@@ -642,7 +674,7 @@ void VulkanEngine::record_command_buffer(const uint32_t imageIndex) const {
     commandBuffer.endRendering();
 
     // Transition the image layout for presentation
-    transition_image_layout(
+    transition_pipeline_image_layout(
         imageIndex,
         vk::ImageLayout::eColorAttachmentOptimal,
         vk::ImageLayout::ePresentSrcKHR,
