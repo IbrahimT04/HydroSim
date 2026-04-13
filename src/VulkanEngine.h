@@ -154,13 +154,18 @@ private:
 
     // Data Objects
     const std::vector<vkBuffer::Vertex> vertices = {
-        {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-        {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-        {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}},
-        {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}}
+        {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+        {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+        {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+        {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},
+        {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+        {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+        {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+        {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}
     };
     const std::vector<uint16_t> indices = {
-        0, 1, 2, 2, 3, 0
+        0, 1, 2, 2, 3, 0,
+        4, 5, 6, 6, 7, 4
     };
 
     // Texture Objects
@@ -168,6 +173,11 @@ private:
     vk::raii::DeviceMemory textureImageMemory{VK_NULL_HANDLE};
     vk::raii::ImageView textureImageView{VK_NULL_HANDLE};
     vk::raii::Sampler textureSampler{VK_NULL_HANDLE};
+
+    // Depth Texture Objects
+    vk::raii::Image depthImage{VK_NULL_HANDLE};
+    vk::raii::DeviceMemory depthImageMemory{VK_NULL_HANDLE};
+    vk::raii::ImageView depthImageView{VK_NULL_HANDLE};
 
     // Frame Objects
     static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
@@ -200,6 +210,15 @@ private:
 
     void create_command_pool();
 
+    void create_depth_resources();
+
+    vk::Format findSupportedFormat(const std::vector<vk::Format> &candidates, vk::ImageTiling tiling,
+                                   vk::FormatFeatureFlags features) const;
+
+    vk::Format findDepthFormat() const;
+
+    static bool hasStencilComponent(vk::Format format);
+
     void create_texture_image();
 
     void create_texture_image_views();
@@ -211,7 +230,8 @@ private:
                       vk::MemoryPropertyFlags properties, vk::raii::Image &image,
                       vk::raii::DeviceMemory &imageMemory) const;
 
-    vk::raii::ImageView create_image_view(const vk::raii::Image &image, vk::Format format);
+    vk::raii::ImageView create_image_view(const vk::raii::Image &image, vk::Format format,
+                                          vk::ImageAspectFlags aspectFlags);
 
     void create_vertex_buffer();
 
@@ -235,16 +255,17 @@ private:
     void create_synchronization_objects();
 
     void transition_image_layout(const vk::raii::Image &image, vk::ImageLayout oldLayout,
-                               vk::ImageLayout newLayout) const;
+                                 vk::ImageLayout newLayout) const;
 
     void transition_pipeline_image_layout(
-        uint32_t imageIndex,
+        vk::Image image,
         vk::ImageLayout oldLayout,
         vk::ImageLayout newLayout,
         vk::AccessFlags2 srcAccessMask,
         vk::AccessFlags2 dstAccessMask,
         vk::PipelineStageFlags2 srcStageMask,
-        vk::PipelineStageFlags2 dstStageMask) const;
+        vk::PipelineStageFlags2 dstStageMask,
+        vk::ImageAspectFlags    image_aspect_flags) const;
 
     void record_command_buffer(uint32_t imageIndex) const;
 
@@ -259,7 +280,7 @@ private:
     void end_single_time_commands(const vk::raii::CommandBuffer &commandBuffer) const;
 
     void copy_buffer_to_image(const vk::raii::Buffer &buffer, const vk::raii::Image &image, uint32_t image_width,
-                           uint32_t image_height) const;
+                              uint32_t image_height) const;
 };
 
 #endif //HYDROSIM_VULKANENGINE_H

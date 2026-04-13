@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.22)
 project(HydroSim LANGUAGES CXX)
 
-add_executable(HydroSim src/main.cpp
+add_executable(HydroSim
+        src/main.cpp
         src/config.h
         src/VulkanEngine.h
         src/VulkanEngine.cpp
@@ -10,37 +11,34 @@ add_executable(HydroSim src/main.cpp
         src/device_helpers.h
         src/swapchain_helpers.h
         src/shader_loader.h
-        src/buffer_helpers.h)
+        src/buffer_helpers.h
+)
 
-# Pick a standard your compiler supports
 set_property(TARGET HydroSim PROPERTY CXX_STANDARD 23)
 set_property(TARGET HydroSim PROPERTY CXX_STANDARD_REQUIRED ON)
 
-# Vulkan (from Vulkan SDK)
 find_package(Vulkan REQUIRED)
 
-# Build GLFW from source inside your repo
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS    OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_DOCS     OFF CACHE BOOL "" FORCE)
 set(GLFW_INSTALL        OFF CACHE BOOL "" FORCE)
 add_subdirectory(external/glfw)
 
-# ---- GLM (header-only) ----
 add_subdirectory(external/glm)
 
-# Link against targets (brings include dirs automatically)
-target_link_libraries(HydroSim PRIVATE glm::glm)
-
-# Link against targets (brings include dirs automatically)
-target_link_libraries(HydroSim PRIVATE Vulkan::Vulkan glfw glm::glm)
+target_link_libraries(HydroSim PRIVATE
+        Vulkan::Vulkan
+        glfw
+        glm::glm
+)
 
 target_include_directories(HydroSim PRIVATE
         ${CMAKE_SOURCE_DIR}/src
-        ${CMAKE_SOURCE_DIR}/external/stb
+        ${CMAKE_SOURCE_DIR}/external/other
 )
 
-find_program(SLANGC_EXECUTABLE NAMES slangc REQUIRED)
+find_program(SLANGC_EXECUTABLE NAMES slangc slangc.exe REQUIRED)
 message(STATUS "Using slangc: ${SLANGC_EXECUTABLE}")
 
 set(SHADER_SOURCE_DIR "${CMAKE_SOURCE_DIR}/src/shaders")
@@ -51,40 +49,25 @@ set(TEXTURE_BINARY_DIR "${CMAKE_BINARY_DIR}/textures")
 file(MAKE_DIRECTORY "${SHADER_BINARY_DIR}")
 file(MAKE_DIRECTORY "${TEXTURE_BINARY_DIR}")
 
-function(add_slang_shader TARGET SHADER_FILE)
-    get_filename_component(SHADER_NAME "${SHADER_FILE}" NAME_WE)
-    set(SHADER_OUTPUT "${SHADER_BINARY_DIR}/${SHADER_NAME}.spv")
-
-    add_custom_command(
-            OUTPUT "${SHADER_OUTPUT}"
-            COMMAND "${CMAKE_COMMAND}" -E make_directory "${SHADER_BINARY_DIR}"
-            COMMAND "${SLANGC_EXECUTABLE}"
-            "${SHADER_FILE}"
-            -target spirv
-            -profile spirv_1_4
-            -fvk-use-entrypoint-name
-            -entry vertMain
-            -entry fragMain
-            -o "${SHADER_OUTPUT}"
-            DEPENDS "${SHADER_FILE}"
-            COMMENT "Compiling shader ${SHADER_FILE} -> ${SHADER_OUTPUT}"
-            VERBATIM
-    )
-
-    target_sources(${TARGET} PRIVATE "${SHADER_OUTPUT}")
-endfunction()
-
-file(GLOB CONFIGURE_DEPENDS SLANG_SHADER_FILES
+file(GLOB SLANG_SHADER_FILES CONFIGURE_DEPENDS
         "${SHADER_SOURCE_DIR}/*.slang"
 )
 
-set(ALL_SHADER_OUTPUTS)
+message(STATUS "Shader source dir: ${SHADER_SOURCE_DIR}")
+message(STATUS "Shader files: ${SLANG_SHADER_FILES}")
+
+if(NOT SLANG_SHADER_FILES)
+    message(WARNING "No .slang shader files found in ${SHADER_SOURCE_DIR}")
+endif()
+
+set(SLANG_SHADER_TARGETS)
+
 foreach(SHADER_FILE IN LISTS SLANG_SHADER_FILES)
     get_filename_component(SHADER_NAME "${SHADER_FILE}" NAME_WE)
     set(SHADER_OUTPUT "${SHADER_BINARY_DIR}/${SHADER_NAME}.spv")
+    set(SHADER_TARGET "slang_shader_${SHADER_NAME}")
 
-    add_custom_command(
-            OUTPUT "${SHADER_OUTPUT}"
+    add_custom_target(${SHADER_TARGET}
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${SHADER_BINARY_DIR}"
             COMMAND "${SLANGC_EXECUTABLE}"
             "${SHADER_FILE}"
@@ -94,16 +77,21 @@ foreach(SHADER_FILE IN LISTS SLANG_SHADER_FILES)
             -entry vertMain
             -entry fragMain
             -o "${SHADER_OUTPUT}"
+            BYPRODUCTS "${SHADER_OUTPUT}"
             DEPENDS "${SHADER_FILE}"
-            COMMENT "Compiling shader ${SHADER_FILE} -> ${SHADER_OUTPUT}"
+            COMMENT "Compiling Slang shader ${SHADER_FILE} -> ${SHADER_OUTPUT}"
             VERBATIM
     )
 
-    list(APPEND ALL_SHADER_OUTPUTS "${SHADER_OUTPUT}")
+    list(APPEND SLANG_SHADER_TARGETS ${SHADER_TARGET})
 endforeach()
 
-add_custom_target(HydroSimShaders ALL DEPENDS ${ALL_SHADER_OUTPUTS})
-add_dependencies(HydroSim HydroSimShaders)
+if(SLANG_SHADER_TARGETS)
+    add_custom_target(HydroSimShaders ALL
+            DEPENDS ${SLANG_SHADER_TARGETS}
+    )
+    add_dependencies(HydroSim HydroSimShaders)
+endif()
 
 add_custom_command(TARGET HydroSim POST_BUILD
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${TEXTURE_BINARY_DIR}"
